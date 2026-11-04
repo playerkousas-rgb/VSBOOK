@@ -1,0 +1,71 @@
+# VSBOOK · 深資童軍電子紀錄冊
+
+> **深資童軍個人隨身離線電子紀錄冊** —— 逐頁對應香港童軍總會《深資童軍紀錄冊》第 1–40 頁及 2026 年第十一版《深資童軍訓練綱要》，支援就地打字／手寫與簽名、一鍵生成及列印 `PT/65`・`PT/19`・`PT/20` 三張官方表格、成員⇄領袖純離線二維碼傳送與核簽回傳，以及與 `vsbadge` 進度 JSON 雙向互通。
+
+- **目前版本**：`v1.0.0`（2026-11-04）
+- **架構形態**：純前端離線優先 PWA（React + Vite + Service Worker，`localStorage` 本機儲存，零帳號、零伺服器、零雲端上傳）
+- **設計主題**：深資童軍酒紅布面燙金封面（Venture Maroon `#5a1321` × 燙金 `#d8b871` × 象牙內頁 `#f8f3e8`），同時提供「紙本原貌」與「手機單欄卡片」雙視圖及 A4 對頁列印
+
+---
+
+## 30 秒開始
+
+```bash
+npm install          # 安裝依賴
+npm run dev          # 啟動本機開發伺服器（0.0.0.0:5173）
+npm test             # 執行單元與資料模型守衛測試（node --test）
+npm run build        # 打包生產版靜態檔案至 dist/
+```
+
+品質閘門驗證（對齊 `playerkousas-rgb/readme` 真理倉）：
+
+```bash
+npm run build && node scripts/guard.mjs && node scripts/final_check_v1.0.mjs --json
+rm -rf dist && node scripts/preflight_v1.0.mjs . --json
+```
+
+---
+
+## 核心功能
+
+1. **逐頁對應紙本第 1–40 頁**：完整涵蓋個人資料（第 1 頁）、轉旅及旅部資料（第 2 頁）、童軍紀錄與更改摘要（第 3 頁）、會員資格續期（第 4–5 頁）、支部目的／方法／誓詞規律（第 6–7 頁）、進度性獎章總覽（第 8 頁）、會員章（第 9–10 頁）、深資童軍肩章（第 11–13 頁）、深資童軍獎章四段章及區總監接見（第 14–20 頁）、榮譽童軍獎章四金帶及區／地域總監接見（第 21–33 頁）、寰宇童軍章與急救章（第 34 頁）、樂行童軍先修章（第 35 頁）、世界童軍組織獎章（第 36 頁）、其他獎章（第 37–38 頁）、其他經驗（第 39 頁）及遠足與海外活動（第 40 頁）。
+2. **就地打字、手寫墨跡與單色簽名壓縮**：任何格線一按即寫，字多自動縮字不爆格；雙擊或按放大鈕可切換「打字／觸控手寫」；簽名與手寫自動轉為透明底單色 PNG，節省本機空間並可直接塞入二維碼。
+3. **手機單欄卡片 ⇄ 紙本原貌即時切換**：在 390px 手機螢幕可一鍵切換高可讀性單欄卡片檢視，或保留紙本紀錄冊框線與印章排版的原貌檢視。
+4. **三張官方表格自動帶入與 A4 列印**：由紀錄冊進度及個人資料即時自動填入：
+   - `FORM PT/65 (8/2026)`：深資童軍獎章及榮譽童軍獎章考驗計劃（1 頁）
+   - `FORM PT/19 (10/2026)`：深資童軍獎章及證書申請表（3 頁，含雙面申請頁及查閱清單 Checklist）
+   - `FORM PT/20 (10/2026)`：榮譽童軍獎章及證書申請表（3 頁，含雙面申請頁及查閱清單 Checklist）
+5. **純離線二維碼傳送與領袖核簽回傳（`VS1.` 協定）**：成員每次自行剔選要出示的組別（預設全不選，敏感資料與大圖清楚標示）產生 `VS1.` 壓縮二維碼；領袖用 `/scan` 掃描查閱後，一次簽名、勾選核簽細項產生「核簽回傳碼」，成員掃回即寫入紀錄冊，全程不經任何伺服器。
+6. **與 `vsbadge` 雙向進度互通**：統一採用 `SCOUT ID`（童軍成員編號）及 2026 第十一版項目編號（`L1-*`、`L2-*`、`L3-*`、`L4-*`、`OT-*`），可直接匯入／匯出 `vsbadge` 進度 JSON。
+7. **中英雙語一鍵切換與離線儲存健康管理**：頂欄一鍵切換繁體中文／English；數位附錄內建 `localStorage` 容量儀表板與一鍵壓縮瘦身工具。
+
+---
+
+## 倉庫導航
+
+| 路徑 | 說明 |
+| :--- | :--- |
+| [`AGENTS.md`](AGENTS.md) | Agent 工作守則、關鍵路徑與不可退讓底線 |
+| [`SCOPE.md`](SCOPE.md) | 專案邊界（In Scope / Out of Scope）及 P1 同類產品參考 |
+| [`GLOSSARY.md`](GLOSSARY.md) | 深資童軍支部、獎章、表格及系統中英統一詞彙表 |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | 修改流程、提交前檢查清單與雙重版本規範 |
+| [`CHANGELOG.md`](CHANGELOG.md) | 版本變更紀錄 |
+| [`LICENSE`](LICENSE) | 版權保留與個人前端使用聲明（All Rights Reserved，非 MIT） |
+| [`docs/00-quickcard.md`](docs/00-quickcard.md) | 一頁速查卡（日常運作與除錯） |
+| [`docs/design-review.md`](docs/design-review.md) | 390 / 768 / 1440 三斷點視覺與互動巡檢紀錄 |
+| [`docs/adr/README.md`](docs/adr/README.md) | 架構決策紀錄（技術棧、純前端 QR 與版權保護） |
+| [`docs/out-of-scope/README.md`](docs/out-of-scope/README.md) | 明確不做事項及姊妹專案分工 |
+| `shared/` | 紀錄冊資料模型（`book.js`）、第十一版訓練綱要（`syllabus.js`）、官方表格映射（`forms.js`）與 `VS1.` 二維碼協定（`transfer.js`） |
+| `web/` | React + Vite 前端應用程式、PWA `sw.js` 及 G11 圖示集（`web/public/icons/`） |
+| [`scripts/README.md`](scripts/README.md) | 真理倉守衛腳本與圖示生成腳本說明 |
+| [`tests/README.md`](tests/README.md) | 單元與資料模型守衛測試（`node --test`） |
+
+---
+
+## 版權及非官方獨立工具聲明
+
+**Copyright © 2026 SCOUT SYSTEM — All Rights Reserved.**（詳見 [`LICENSE`](LICENSE)，本專案**並非** MIT 開源授權，未經書面授權嚴禁任何機構或個人複製、改作或據為己有。）
+
+本網站為非官方獨立工具，旨在方便成員，與香港童軍總會無任何官方從屬關係。所有訓練綱要及紀錄冊內容，版權歸香港童軍總會所有。
+
+This site is an independent, unofficial tool for members, and has no official affiliation with The Scout Association of Hong Kong. All training syllabus and record-book content is the copyright of The Scout Association of Hong Kong.

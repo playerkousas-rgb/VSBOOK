@@ -1,0 +1,17 @@
+{
+  "name": "VSBOOK 深資童軍紀錄冊",
+  "short_name": "VSBOOK",
+  "description": "深資童軍個人隨身離線電子紀錄冊：逐頁對應第 1–40 頁、自動生成 PT/65・PT/19・PT/20 及純離線二維碼核簽。",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#4a0e1b",
+  "theme_color": "#5a1321",
+  "lang": "zh-Hant-HK",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
