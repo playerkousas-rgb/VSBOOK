@@ -1,69 +1,144 @@
 import React, { useState } from 'react';
 import { SECTIONS, allStats, sanitizeHkidPrefix, today, uid } from '@shared/book.js';
 import { useBook, useField } from '../bookContext.js';
-import { Area, Bilingual, Grid, H, Line, Note, P, Page, Rows, Sig } from '../components/Form.jsx';
+import { Area, BadgeArt, Bilingual, Grid, H, Line, Note, P, Page, Rows, Sig } from '../components/Form.jsx';
 import { PhotoPicker } from '../components/PhotoPicker.jsx';
 import Write from '../components/Write.jsx';
 import { SignModal } from '../components/Ink.jsx';
-import { Icon, SealMark } from '../ui.jsx';
-import { Link, navigate } from '../router.jsx';
+import { Icon, SealMark, cx } from '../ui.jsx';
+import { Link } from '../router.jsx';
 import { useLang } from '../i18n.jsx';
-import { LegalNote } from '../components/Legal.jsx';
 
-/* ------------------------------------------------------------ 數位目錄頁 */
+const TOC_GROUPS = [
+  {
+    title: '個人及支部要旨',
+    en: 'Personal & Section Essentials',
+    ids: ['p01', 'p02', 'p03', 'p04', 'p05', 'p06', 'p07', 'p08'],
+  },
+  {
+    title: '會員章及深資童軍肩章',
+    en: 'Membership Badge & Epaulettes',
+    ids: ['p09', 'p10', 'p11', 'p12', 'p13'],
+  },
+  {
+    title: '深資童軍獎章（四段章）',
+    en: 'Venture Scout Award · 4 Badges',
+    ids: ['p14', 'p15', 'p16', 'p17', 'p18', 'p19', 'p20'],
+  },
+  {
+    title: '榮譽童軍獎章（四金帶）',
+    en: 'Dragon Scout Award · 4 Bars',
+    ids: ['p21', 'p22', 'p23', 'p24', 'p25', 'p26', 'p27', 'p28', 'p29', 'p30', 'p31', 'p32', 'p33'],
+  },
+  {
+    title: '其他獎章、經驗及附錄',
+    en: 'Other Badges, Records & Appendix',
+    ids: ['p34', 'p35', 'p36', 'p37', 'p38', 'p39', 'p40', 'appendix'],
+  },
+];
+
+/* ------------------------------------------------------------ 數位目錄頁（對齊 ROVERBOOK Contents） */
 export function ContentsPage() {
   const { book } = useBook();
   const { isEn } = useLang();
   const stats = allStats(book);
-  const printed = SECTIONS.filter((s) => !s.digital);
 
   return (
     <Page id="contents" className="p-contents">
-      <H en="CONTENTS & PROGRESS OVERVIEW">全冊 40 頁目錄與進度總覽</H>
+      <div className="tocintro">
+        <div>
+          <span className="tocintro__kicker">{isEn ? 'HOW THIS BOOK WORKS' : '使用說明'}</span>
+          <h2>
+            {isEn
+              ? 'Page numbers match the paper record book; tap any line to fill.'
+              : '頁碼與紙本一致；點一下橫線就可以寫字。'}
+          </h2>
+          <p>
+            {isEn
+              ? '1–40 follow the printed Venture Scout Record Book (11th Edition Syllabus). Everything stays on this device; tap “Show QR” in the top bar to share selected sections with your leader.'
+              : '第 1–40 頁完全依香港童軍總會《深資童軍紀錄冊》（第十一版訓練綱要）編排。所有內容儲存在本機；要給領袖過目或簽名時，按右上角「出示 QR」即可逐項選擇要傳送的內容。'}
+          </p>
+        </div>
 
-      <div className="tocstats">
-        {stats.badges.map((b) => (
-          <div key={b.badge.id} className="tocstat">
-            <div className="tocstat__top">
-              <strong>{isEn ? b.badge.en : b.badge.name}</strong>
-              <span>{b.percent}%</span>
+        <div className="tocring">
+          <svg viewBox="0 0 88 88" width="84" height="84" aria-hidden="true">
+            <circle cx="44" cy="44" r="37" className="tocring__bg" />
+            <circle
+              cx="44"
+              cy="44"
+              r="37"
+              className="tocring__fg"
+              strokeDasharray={`${Math.round((stats.percent / 100) * 232.5)} 232.5`}
+            />
+          </svg>
+          <div className="tocring__txt">
+            <strong>{stats.percent}%</strong>
+            <span>
+              {stats.done}/{stats.total}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="tocbadges">
+        {stats.badges.map(({ badge, done, total, percent, awarded }) => (
+          <div key={badge.id} className={cx('tocbadge', (percent === 100 || awarded) && 'is-done')}>
+            <div className="tocbadge__top">
+              <strong>{isEn ? badge.en : badge.name}</strong>
+              <span>
+                {done}/{total}
+              </span>
             </div>
-            <div className="tocstat__bar">
-              <i style={{ width: `${b.percent}%` }} />
+            <div className="tocbadge__bar">
+              <i style={{ width: `${percent}%` }} />
             </div>
-            <small>
-              {b.done} / {b.total} {b.awarded ? `· ${isEn ? 'Completed' : '完成'} ${b.awarded}` : ''}
-            </small>
+            {awarded && (
+              <small>
+                {isEn ? 'Completed ' : '已完成 · '}
+                {awarded}
+              </small>
+            )}
           </div>
         ))}
       </div>
 
-      <div className="tocactions">
-        <Link to="/forms" className="btn btn--primary btn--sm">
-          <Icon name="file" size={14} /> {isEn ? 'Generate PT/65 · PT/19 · PT/20' : '生成三張官方表格（PT/65・PT/19・PT/20）'}
-        </Link>
-        <Link to="/print" className="btn btn--ghost btn--sm">
-          <Icon name="print" size={14} /> {isEn ? 'Print All 40 Pages' : '整本 40 頁列印'}
-        </Link>
-        <Link to="/p/appendix" className="btn btn--ghost btn--sm">
-          <Icon name="download" size={14} /> {isEn ? 'vsbadge Sync & Backup' : 'vsbadge 互通與備份'}
-        </Link>
-      </div>
-
-      <div className="toclist">
-        {printed.map((s) => (
-          <button type="button" key={s.id} className="tocrow" onClick={() => navigate(`/p/${s.id}`)}>
-            <span className="tocrow__no">{isEn ? `Page ${s.page}` : `第 ${s.page} 頁`}</span>
-            <span className="tocrow__title">
-              <strong>{isEn ? s.en : s.label}</strong>
-              {!isEn && <em>{s.en}</em>}
-            </span>
-            {s.badge && <span className="tocrow__tag">{s.badge}</span>}
-          </button>
+      <div className="tocgroups">
+        {TOC_GROUPS.map((g) => (
+          <section key={g.title} className="tocgroup">
+            <header>
+              <h3>{isEn ? g.en : g.title}</h3>
+              {!isEn && <span>{g.en}</span>}
+            </header>
+            <ol>
+              {g.ids.map((id) => {
+                const s = SECTIONS.find((x) => x.id === id);
+                if (!s) return null;
+                return (
+                  <li key={s.id}>
+                    <Link to={`/p/${s.id}`} className="tocline">
+                      <span className="tocline__title">
+                        {isEn ? s.en || s.label : s.label}
+                        {!isEn && s.en && <em>{s.en}</em>}
+                      </span>
+                      <span className="tocline__dots" aria-hidden="true" />
+                      <span className="tocline__no">{s.page === '—' ? (isEn ? 'App.' : '附錄') : s.page}</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ol>
+          </section>
         ))}
       </div>
 
-      <LegalNote compact />
+      <div className="tocfooter">
+        <Link to="/p/p01" className="btn btn--primary">
+          {isEn ? 'Start from Page 1' : '從第 1 頁開始填寫'} <Icon name="chevron" size={14} />
+        </Link>
+        <Link to="/forms" className="btn btn--ghost">
+          <Icon name="seal" size={14} /> {isEn ? '3 Official Forms (PT/65 · 19 · 20)' : '三張官方表格（PT/65・19・20）'}
+        </Link>
+      </div>
     </Page>
   );
 }
@@ -470,6 +545,7 @@ export function P08() {
     {
       id: 'L1',
       to: '/p/p09',
+      img: '/img/badge-membership.png',
       zh: '會員章',
       en: 'MEMBERSHIP BADGE',
       pZh: '會員章旨在幫助新加入的深資童軍認識其所屬之深資童軍團，以促進他與其他團員間相互關係，並為彼等所接納。',
@@ -478,6 +554,8 @@ export function P08() {
     {
       id: 'L2',
       to: '/p/p11',
+      img: '/img/badge-epaulettes.png',
+      ep: true,
       zh: '深資童軍肩章',
       en: 'VENTURE SCOUT EPAULETTES',
       pZh: '深資童軍肩章之設立旨在提供階梯，讓剛獲頒會員章的深資童軍對深資童軍支部活動及童軍技能有基本認識和體驗。',
@@ -486,6 +564,7 @@ export function P08() {
     {
       id: 'L3',
       to: '/p/p14',
+      img: '/img/badge-vsa.png',
       zh: '深資童軍獎章',
       en: 'VENTURE SCOUT AWARD',
       pZh: '深資童軍完成肩章內容後，可開始考取深資童軍獎章。深資童軍獎章設有「活動策劃」、「社會服務」、「多元技能」及「戶外探險」四個項目。在深資童軍完成上述任何一項之內容後，即可佩戴該項目之段章，亦可開始與區會指定人士商討考取該段章之金帶。深資童軍獎章是由總會根據區之推薦及地域之批核而簽發。',
@@ -494,6 +573,7 @@ export function P08() {
     {
       id: 'L4',
       to: '/p/p21',
+      img: '/img/badge-dsa.png',
       zh: '榮譽童軍獎章',
       en: 'DRAGON SCOUT AWARD',
       pZh: '深資童軍與區會指定人士商討後，便可開始進行考取該段章之金帶的考核。榮譽童軍獎章亦設有「活動策劃」、「社會服務」、「多元技能」及「戶外探險」四個項目。深資童軍在完成有關項目後，可在該項目之段章下配戴一條金帶。榮譽童軍獎章是由總會根據地域及區之推薦作批核，並由總領袖及香港總監簽發。',
@@ -509,16 +589,21 @@ export function P08() {
           const s = byId[st.id];
           return (
             <div key={st.id} className="stagecard">
-              <div className="stagecard__head">
-                <div>
-                  <strong>{isEn ? st.en : st.zh}</strong>
-                  {!isEn && <em>{st.en}</em>}
-                </div>
-                <Link to={st.to} className="stagecard__pill">
-                  {s?.done || 0}/{s?.total || 0} ({s?.percent || 0}%) →
-                </Link>
+              <div className="stagecard__art">
+                <BadgeArt src={st.img} ep={st.ep} sm />
               </div>
-              <p>{isEn ? st.pEn : st.pZh}</p>
+              <div className="stagecard__main">
+                <div className="stagecard__head">
+                  <div>
+                    <strong>{isEn ? st.en : st.zh}</strong>
+                    {!isEn && <em>{st.en}</em>}
+                  </div>
+                  <Link to={st.to} className="stagecard__pill">
+                    {s?.done || 0}/{s?.total || 0} ({s?.percent || 0}%) →
+                  </Link>
+                </div>
+                <p>{isEn ? st.pEn : st.pZh}</p>
+              </div>
             </div>
           );
         })}

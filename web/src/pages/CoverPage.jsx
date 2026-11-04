@@ -1,108 +1,96 @@
 import React from 'react';
-import { APP_VERSION, PAGE_TOTAL, allStats, membershipStatus } from '@shared/book.js';
-import { Crest, Icon } from '../ui.jsx';
-import { Link } from '../router.jsx';
+import { allStats } from '@shared/book.js';
+import { Crest, cx } from '../ui.jsx';
 import { useLang } from '../i18n.jsx';
 import { LegalLine } from '../components/Legal.jsx';
 
-export default function CoverPage({ book, onOpen, last, onContinue, onShowQr }) {
+/**
+ * 全幅深資童軍酒紅布面燙金封面（對齊 ROVERBOOK .coverart 結構，色系改為深資童軍紅）：
+ * 全書唯一一行非官方版權細字置於封面最底（附錄及選單「關於」保留完整版）。
+ */
+export default function CoverPage({ book, onOpen, last, onContinue }) {
   const { isEn } = useLang();
+  const m = book?.member || {};
   const stats = allStats(book);
-  const mem = membershipStatus(book);
-  const m = book.member || {};
+
+  const hint = !m.nameZh
+    ? isEn
+      ? 'Step 1: write your name on Page 1'
+      : '第一步：寫上你的名字'
+    : isEn
+      ? `${stats.done} / ${stats.total} milestones · Next: ${stats.nextBadge?.badge?.en || 'All completed'}`
+      : `已完成 ${stats.done} / ${stats.total} 項 · 下一步：${
+          stats.nextBadge?.badge?.name ? `完成${stats.nextBadge.badge.name}` : '全部完成，等領袖簽署'
+        }`;
+
+  const medals = [
+    { id: 'L1', label: isEn ? 'Membership Badge' : '會員章', short: isEn ? 'MB' : '會', earned: Boolean(book?.pages?.p10?.investitureDate || stats.badges[0]?.percent === 100) },
+    { id: 'L2', label: isEn ? 'Epaulettes' : '深資童軍肩章', short: isEn ? 'EP' : '肩', earned: Boolean(book?.pages?.p13?.completionDate || stats.badges[1]?.percent === 100) },
+    { id: 'L3', label: isEn ? 'Venture Scout Award' : '深資童軍獎章', short: isEn ? 'VS' : '深', earned: Boolean(book?.pages?.p20?.completionDate || stats.badges[2]?.percent === 100) },
+    { id: 'L4', label: isEn ? 'Dragon Scout Award' : '榮譽童軍獎章', short: isEn ? 'DS' : '榮', earned: Boolean(book?.pages?.p33?.completionDate || stats.badges[3]?.percent === 100) },
+  ];
 
   return (
-    <section className="bookcover" aria-label={isEn ? 'Venture Scout Record Book Cover' : '深資童軍紀錄冊封面'}>
-      <div className="bookcover__spine" aria-hidden="true" />
-      <div className="bookcover__frame">
-        <div className="bookcover__top">
-          <span className="bookcover__edition">
-            {isEn ? `2026 11TH EDITION · ${PAGE_TOTAL} PAGES` : `2026 第十一版訓練綱要 · 全冊 ${PAGE_TOTAL} 頁`}
-          </span>
-          <span className="bookcover__ver">{APP_VERSION}</span>
+    <div className="coverart">
+      <div className="coverart__grain" aria-hidden="true" />
+      <span className="coverart__frame coverart__frame--outer" aria-hidden="true" />
+      <span className="coverart__frame coverart__frame--inner" aria-hidden="true" />
+      <span className="coverart__spine" aria-hidden="true" />
+
+      <div className="coverart__top">
+        <Crest size={58} />
+        <div>
+          <strong>{isEn ? 'SCOUT ASSOCIATION OF HONG KONG' : '香港童軍總會'}</strong>
+          {!isEn && <em>SCOUT ASSOCIATION OF HONG KONG</em>}
         </div>
+      </div>
 
-        <div className="bookcover__emblem">
-          <Crest size={78} />
-          <p className="bookcover__org">香港童軍總會</p>
-          <h1 className="bookcover__title">深資童軍紀錄冊</h1>
-          <div className="bookcover__rule" />
-          <p className="bookcover__en">SCOUT ASSOCIATION OF HONG KONG</p>
-          <p className="bookcover__ensub">VENTURE SCOUT RECORD BOOK</p>
+      <div className="coverart__center">
+        <img className="coverart__emblem" src="/img/crest-venture.png" alt="" aria-hidden="true" />
+        <span className="coverart__kicker">VENTURE SCOUT</span>
+        <h1 className="coverart__title">深資童軍</h1>
+        <h2 className="coverart__subtitle">紀　錄　冊</h2>
+        <span className="coverart__en">RECORD BOOK</span>
+      </div>
+
+      <div className="coverart__plate">
+        <span className="coverart__plate-label">{isEn ? 'HOLDER' : '持有人 HOLDER'}</span>
+        <strong>{(isEn && m.nameEn ? m.nameEn : m.nameZh) || (isEn ? 'Your Name' : '你的名字')}</strong>
+        <span className="coverart__plate-sub">
+          {[m.unit, m.group].filter(Boolean).join(' · ') || (isEn ? 'Venture Scout Unit' : '深資童軍團')}
+        </span>
+        {m.scoutId && <span className="coverart__plate-no">No. {m.scoutId}</span>}
+        {hint && <span className="coverart__hint">{hint}</span>}
+        <div className="coverart__badges">
+          {medals.map((b) => (
+            <span
+              key={b.id}
+              className={cx('coverart__medal', b.earned && 'is-earned')}
+              title={`${b.label}${b.earned ? (isEn ? ' · Earned' : ' · 已完成') : isEn ? ' · In progress' : ' · 進行中'}`}
+            >
+              {b.short}
+            </span>
+          ))}
         </div>
+      </div>
 
-        <div className="bookcover__holder">
-          <div className="bookcover__plate">
-            <div>
-              <small>{isEn ? 'HOLDER' : '持有人'}</small>
-              <strong>{m.nameZh || m.nameEn || (isEn ? 'Tap Open to fill your name' : '尚未填寫姓名（打開第 1 頁填寫）')}</strong>
-              {m.nameZh && m.nameEn && <em>{m.nameEn}</em>}
-            </div>
-            <div className="bookcover__meta">
-              <span>SCOUT ID: {m.scoutId || '—'}</span>
-              <span>{m.group || m.unit || (isEn ? 'Unit unset' : '未填旅團')}</span>
-              <span className={mem.active ? 'is-valid' : ''}>
-                {mem.validUntil
-                  ? isEn
-                    ? `Valid till ${mem.validUntil}`
-                    : `會籍有效至 ${mem.validUntil}`
-                  : isEn
-                    ? 'Membership renewal unset'
-                    : '未填會籍續期（第 4 頁）'}
-              </span>
-            </div>
-          </div>
-
-          <div className="bookcover__badges">
-            {stats.badges.map((b) => (
-              <Link
-                key={b.badge.id}
-                to={b.badge.id === 'L1' ? '/p/p09' : b.badge.id === 'L2' ? '/p/p11' : b.badge.id === 'L3' ? '/p/p14' : '/p/p21'}
-                className="coverstat"
-              >
-                <span className="coverstat__head">
-                  <strong>{isEn ? b.badge.en : b.badge.name}</strong>
-                  <b>{b.percent}%</b>
-                </span>
-                <span className="coverstat__bar">
-                  <i style={{ width: `${b.percent}%` }} />
-                </span>
-                <small>
-                  {b.done} / {b.total} {b.unitLabel ? (isEn ? '' : b.unitLabel) : isEn ? 'items' : '項'}
-                </small>
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        <div className="bookcover__cta">
-          <button type="button" className="btn btn--gold btn--lg" onClick={onOpen}>
-            <Icon name="book" size={17} /> {isEn ? 'Open Record Book (Page 1)' : '打開紀錄冊（第 1 頁）'}
+      <div className="coverart__foot">
+        <span className="coverart__year">{new Date().getFullYear()}</span>
+        <div className="coverart__ctas">
+          <button type="button" className="coverart__open" onClick={onOpen}>
+            {isEn ? 'Open the record book' : '打開紀錄冊'}
           </button>
           {last && (
-            <button type="button" className="btn btn--coverghost" onClick={onContinue}>
-              {isEn ? `Continue P.${last.page} · ${last.en}` : `繼續上次：第 ${last.page} 頁 · ${last.label}`}
+            <button type="button" className="coverart__resume" onClick={onContinue}>
+              {isEn ? `Continue · page ${last.page}` : `繼續上次 · 第 ${last.page} 頁`}{' '}
+              <span>{isEn ? last.en || last.label : last.label}</span>
             </button>
           )}
         </div>
-
-        <div className="bookcover__quick">
-          <Link to="/p/contents" className="coverchip">
-            <Icon name="book" size={14} /> {isEn ? '40-Page Contents' : '40 頁目錄'}
-          </Link>
-          <Link to="/forms" className="coverchip">
-            <Icon name="file" size={14} /> {isEn ? 'PT/65 · PT/19 · PT/20' : '三張官方表格'}
-          </Link>
-          <button type="button" className="coverchip" onClick={onShowQr}>
-            <Icon name="qr" size={14} /> {isEn ? 'Present QR' : '出示二維碼'}
-          </button>
-          <Link to="/scan" className="coverchip">
-            <Icon name="camera" size={14} /> {isEn ? 'Leader Scan' : '掃描核簽'}
-          </Link>
-        </div>
-
-        <LegalLine className="bookcover__legal" />
+        <span className="coverart__edition">{isEn ? 'Edition XI' : '第十一版綱要'}</span>
       </div>
-    </section>
+
+      <LegalLine className="coverart__legal" />
+    </div>
   );
 }

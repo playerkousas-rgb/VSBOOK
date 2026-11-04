@@ -4,19 +4,25 @@ import { SignaturePad } from './Ink.jsx';
 import { shrinkInk } from '../signature.js';
 import { useLang } from '../i18n.jsx';
 
+/**
+ * Write — 紙本橫線／欄位填寫元件（對齊 ROVERBOOK v15）：
+ * 螢幕上空白欄位只顯示小圓圈（.write__dot），點一下即可輸入或手寫；
+ * 列印時自動隱藏圓圈並回復紙本橫線。
+ */
+
 export const isInkValue = (v) => Boolean(v && typeof v === 'object' && typeof v.ink === 'string');
 export const plainText = (v) => (isInkValue(v) ? '' : typeof v === 'string' ? v : '');
 
-const MAX = 15;
-const MIN = 8;
+const MAX = 15.5;
+const MIN = 7;
 const STEP = 0.5;
 
 function fitText(el, max = MAX) {
   if (!el) return;
   let size = max;
   el.style.fontSize = `${size}px`;
-  const overflow = () => el.scrollHeight > el.clientHeight + 2 || el.scrollWidth > el.clientWidth + 2;
-  let guard = 32;
+  const overflow = () => el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1;
+  let guard = 40;
   while (size > MIN && overflow() && guard-- > 0) {
     size -= STEP;
     el.style.fontSize = `${size}px`;
@@ -41,6 +47,19 @@ export default function Write({
   const [zoom, setZoom] = useState(false);
   const fieldRef = useRef(null);
   const inputRef = useRef(null);
+
+  // 手機：開始輸入時，把欄位拉到畫面中央，避免被鍵盤遮住
+  const reveal = useCallback((el) => {
+    if (!el || typeof window === 'undefined') return;
+    if (!window.matchMedia?.('(max-width: 740px)').matches) return;
+    setTimeout(() => {
+      el.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+    }, 280);
+  }, []);
+
+  useEffect(() => {
+    if (editing) reveal(inputRef.current);
+  }, [editing, reveal]);
 
   const commit = useCallback((next) => onChange?.(next), [onChange]);
 
@@ -92,7 +111,8 @@ export default function Write({
         style={multiline ? { '--rows': rows } : undefined}
         onClick={() => {
           if (editing) return;
-          if (isInkValue(value)) setZoom(true);
+          const touch = typeof window !== 'undefined' && window.matchMedia?.('(hover: none)').matches;
+          if (isInkValue(value) || touch) setZoom(true);
           else setEditing(true);
         }}
         onDoubleClick={openZoom}
@@ -105,7 +125,7 @@ export default function Write({
             else setEditing(true);
           }
         }}
-        aria-label={label || placeholder || (isEn ? 'Edit field' : '點擊填寫')}
+        aria-label={label || placeholder || (isEn ? 'Fill field' : '填寫')}
       >
         {editing ? (
           multiline ? (
@@ -145,7 +165,7 @@ export default function Write({
             />
           )
         ) : isInkValue(value) ? (
-          <img className="write__ink" src={value.ink} alt={label || '手寫墨跡'} />
+          <img className="write__ink" src={value.ink} alt={label || placeholder || '手寫'} />
         ) : (
           <span
             className="write__fit write__text"
@@ -153,17 +173,17 @@ export default function Write({
             title={plainText(value) || undefined}
             style={align ? { textAlign: align } : undefined}
           >
-            {plainText(value) || <em className="write__ph">{placeholder || (isEn ? 'Tap to fill' : '點擊填寫')}</em>}
+            {plainText(value) || <span className="write__dot" aria-hidden="true" />}
           </span>
         )}
 
-        {!editing && (
+        {!editing && Boolean(value) && (
           <button
             type="button"
             className="write__zoom"
             onClick={openZoom}
-            aria-label={isEn ? 'Expand editor' : '放大打字或手寫'}
-            title={isEn ? 'Type or Handwrite' : '放大打字／手寫'}
+            aria-label={isEn ? 'Expand editor' : '放大填寫'}
+            title={isEn ? 'Expand editor' : '放大填寫'}
           >
             <Icon name="expand" size={11} />
           </button>
@@ -173,12 +193,12 @@ export default function Write({
       {zoom && (
         <Modal
           onClose={() => setZoom(false)}
-          eyebrow={isEn ? 'WRITE / INK' : '放大輸入 · 打字或手寫'}
-          title={label || (isEn ? 'Edit Field' : '填寫欄位')}
+          eyebrow="WRITE"
+          title={label || (isEn ? 'Edit Field' : '放大填寫')}
           subtitle={
             isEn
-              ? 'Text automatically scales to fit the box. You can also switch to stylus/finger handwriting.'
-              : '字數多時會自動縮字貼合格線；亦可切換至觸控手寫模式。'
+              ? 'Long text shrinks automatically to fit. Type comfortably here or write with stylus/finger.'
+              : '字數多時會自動縮小；在這裡可以舒服地打字或手寫（手寫板適用於平板／觸控筆）。'
           }
           wide
         >
@@ -212,7 +232,7 @@ function ZoomEditor({ value, multiline, rows, placeholder, onSave, onCancel }) {
     if (!ink) return onSave('');
     setSaving(true);
     try {
-      const small = await shrinkInk(ink, { maxW: 640, maxH: 140 });
+      const small = await shrinkInk(ink, { maxW: 640, maxH: 120 });
       onSave({ ink: small || ink });
     } finally {
       setSaving(false);
@@ -221,12 +241,12 @@ function ZoomEditor({ value, multiline, rows, placeholder, onSave, onCancel }) {
 
   return (
     <>
-      <div className="zoomtabs" role="tablist">
+      <div className="zoomtabs" role="tablist" aria-label={isEn ? 'Input mode' : '輸入方式'}>
         <button type="button" role="tab" aria-selected={tab === 'type'} className={cx('zoomtab', tab === 'type' && 'is-on')} onClick={() => setTab('type')}>
-          <Icon name="edit" size={14} /> {isEn ? 'Type' : '鍵盤打字'}
+          <Icon name="edit" size={14} /> {isEn ? 'Type' : '打字'}
         </button>
         <button type="button" role="tab" aria-selected={tab === 'ink'} className={cx('zoomtab', tab === 'ink' && 'is-on')} onClick={() => setTab('ink')}>
-          <Icon name="pen" size={14} /> {isEn ? 'Handwrite' : '觸控手寫'}
+          <Icon name="pen" size={14} /> {isEn ? 'Handwrite' : '手寫'}
         </button>
       </div>
 
@@ -260,7 +280,7 @@ function ZoomEditor({ value, multiline, rows, placeholder, onSave, onCancel }) {
       <div className="modal__actions">
         {Boolean(value) && (
           <button type="button" className="btn btn--ghost" onClick={() => onSave('')}>
-            {isEn ? 'Clear Field' : '清空欄位'}
+            {isEn ? 'Clear' : '清空'}
           </button>
         )}
         <button type="button" className="btn btn--ghost" onClick={onCancel}>

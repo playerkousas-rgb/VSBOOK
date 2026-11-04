@@ -19,7 +19,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
 
-    <meta name="theme-color" content="#5a1321" />
+    <meta name="theme-color" content="#540f1e" />
     <meta property="og:title" content="VSBOOK · 深資童軍電子紀錄冊" />
     <meta
       property="og:description"
@@ -37,13 +37,15 @@
       window.APP_VERSION = 'v1.0.0';
       try {
         var savedLang = localStorage.getItem('vsbook.lang');
-        if (savedLang === 'en') document.documentElement.setAttribute('data-lang', 'en');
-      } catch (e) {}
+        document.documentElement.setAttribute('data-lang', savedLang === 'en' ? 'en' : 'zh');
+      } catch (e) {
+        document.documentElement.setAttribute('data-lang', 'zh');
+      }
     </script>
   </head>
   <body>
     <div id="root">
-      <div style="padding:24px;color:#f3ddab;background:#5a1321;font-family:system-ui,sans-serif;text-align:center">
+      <div id="app-boot" style="padding:24px;color:#f0dba6;background:#2a060f;font-family:system-ui,sans-serif;text-align:center">
         VSBOOK v1.0.0 · 深資童軍電子紀錄冊 · Copyright © 2026 SCOUT SYSTEM
       </div>
     </div>

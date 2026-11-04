@@ -11,7 +11,7 @@ import {
   uid,
 } from '@shared/book.js';
 import { useBook, useField } from '../bookContext.js';
-import { Bilingual, Grid, H, Line, P, Page, Rows } from '../components/Form.jsx';
+import { BadgeArt, Bilingual, Grid, H, Line, P, Page, Rows } from '../components/Form.jsx';
 import Write from '../components/Write.jsx';
 import { download, slugify } from '../bookStore.js';
 import { compressBookMedia, imageSizeLabel, storageUsage } from '../storageHealth.js';
@@ -43,7 +43,10 @@ export function P34() {
     <Page id="p34">
       <H en="OTHER BADGES">其他獎章</H>
 
-      <Bilingual as="h3" className="secsub" zh="寰宇童軍章" en="SCOUTS OF THE WORLD AWARD" />
+      <div className="pgbanner pgbanner--sub">
+        <BadgeArt src="/img/badge-swa.png" sm />
+        <Bilingual as="h3" className="secsub" zh="寰宇童軍章" en="SCOUTS OF THE WORLD AWARD" />
+      </div>
       <Grid cols={2}>
         <Line label="「探索」課程證書日期" en="Date of SWA – Discovery Certificate" type="date" path="pages.p34.swaDiscoveryDate" />
         <Line label="「探索」課程證書編號" en="Certificate No. of SWA – Discovery" path="pages.p34.swaDiscoveryCert" />
@@ -66,7 +69,10 @@ export function P34() {
         </div>
       </Grid>
 
-      <Bilingual as="h3" className="secsub" zh="深資童軍急救章" en="VENTURE SCOUT FIRST AID BADGE" />
+      <div className="pgbanner pgbanner--sub">
+        <BadgeArt src="/img/badge-firstaid.png" sm />
+        <Bilingual as="h3" className="secsub" zh="深資童軍急救章" en="VENTURE SCOUT FIRST AID BADGE" />
+      </div>
       <Grid cols={2}>
         <div className="frow">
           <span className="frow__label">
@@ -98,7 +104,10 @@ export function P35() {
 
   return (
     <Page id="p35">
-      <H en="ROVER SCOUT LINK BADGE">樂行童軍先修章</H>
+      <div className="pgbanner">
+        <BadgeArt src="/img/badge-rover-link.png" />
+        <H en="ROVER SCOUT LINK BADGE">樂行童軍先修章</H>
+      </div>
       <div className="awardbox">
         <Grid cols={2}>
           <div className="frow">

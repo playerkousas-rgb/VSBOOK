@@ -1,49 +1,58 @@
 import React, { useRef, useState } from 'react';
-import { APP_VERSION, demoBook, importFromVsBadge, newBook } from '@shared/book.js';
-import { Crest, Icon, useToast } from '../ui.jsx';
-import { useLang } from '../i18n.jsx';
-import { LegalNote } from '../components/Legal.jsx';
+import { useToast, Crest, Icon } from '../ui.jsx';
+import { demoBook, importFromVsBadge, newBook } from '@shared/book.js';
+import { persistBook } from '../bookStore.js';
 import { navigate } from '../router.jsx';
 
 export default function Welcome({ onReady, onLeaderScan }) {
-  const { isEn, toggle } = useLang();
   const { push } = useToast();
+  const [form, setForm] = useState({
+    nameZh: '',
+    nameEn: '',
+    scoutId: '',
+    unit: '',
+    group: '',
+    district: '',
+    region: '',
+  });
   const fileRef = useRef(null);
-  const [nameZh, setNameZh] = useState('');
-  const [scoutId, setScoutId] = useState('');
-  const [group, setGroup] = useState('');
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
-  const createBlank = (e) => {
-    e.preventDefault();
-    const b = newBook({
-      member: {
-        nameZh: nameZh.trim(),
-        scoutId: scoutId.trim(),
-        group: group.trim(),
-      },
-    });
-    onReady(b);
-    navigate('/p/p01');
+  const start = (book, target) => {
+    persistBook(book);
+    onReady(book);
+    navigate(target);
   };
 
-  const handleImport = (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
+  const create = (e) => {
+    e.preventDefault();
+    if (!form.nameZh.trim() && !form.nameEn.trim()) return;
+    start(newBook({ member: form }), '/p/p01');
+    push('紀錄冊已建立，開始填寫吧');
+  };
+
+  const importFile = (file) => {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const json = JSON.parse(String(reader.result || '{}'));
-        if (json && json.member && typeof json.member === 'object') {
-          onReady(newBook(json));
-          push(isEn ? 'Record book restored' : '已還原完整紀錄冊備份');
+        const data = JSON.parse(String(reader.result));
+        if (data?.member && data?.pages) {
+          start(newBook(data), '/p/contents');
+          push('備份已還原');
           return;
         }
-        const { book, imported } = importFromVsBadge(json, newBook());
-        onReady(book);
-        push(isEn ? `Imported ${imported} items from vsbadge` : `已從 vsbadge 匯入 ${imported} 項進度`);
+        if (data?.progress || Array.isArray(data?.members) || data?.schema?.includes('vsbadge')) {
+          const draft = newBook();
+          const res = importFromVsBadge(data, draft);
+          draft.member = res.member;
+          start(newBook(draft), '/p/contents');
+          push(`已從 vsbadge 匯入 ${res.imported} 項進度`);
+          return;
+        }
+        throw new Error('這不是 VSBOOK 或 vsbadge 備份檔');
       } catch (err) {
-        push(err.message || '檔案格式未能識別', 'error');
+        push(err.message || '檔案格式不正確', 'error');
       }
     };
     reader.readAsText(file);
@@ -51,66 +60,116 @@ export default function Welcome({ onReady, onLeaderScan }) {
 
   return (
     <div className="welcome">
-      <div className="welcome__topbar">
-        <span className="welcome__ver">VSBOOK {APP_VERSION}</span>
-        <button type="button" className="chipbtn chipbtn--lang" onClick={toggle}>
-          <Icon name="globe" size={14} /> <span>{isEn ? '中文' : 'EN'}</span>
-        </button>
+      <div className="welcome__cover">
+        <div className="coverart coverart--inline">
+          <div className="coverart__grain" aria-hidden="true" />
+          <span className="coverart__frame coverart__frame--outer" aria-hidden="true" />
+          <span className="coverart__frame coverart__frame--inner" aria-hidden="true" />
+          <span className="coverart__spine" aria-hidden="true" />
+          <div className="coverart__top">
+            <Crest size={50} />
+            <div>
+              <strong>香港童軍總會</strong>
+              <em>SCOUT ASSOCIATION OF HONG KONG</em>
+            </div>
+          </div>
+          <div className="coverart__center">
+            <img className="coverart__emblem" src="/img/crest-venture.png" alt="" aria-hidden="true" />
+            <span className="coverart__kicker">VENTURE SCOUT</span>
+            <h1 className="coverart__title">深資童軍</h1>
+            <h2 className="coverart__subtitle">紀　錄　冊</h2>
+            <span className="coverart__en">RECORD BOOK</span>
+          </div>
+          <div className="coverart__plate">
+            <span className="coverart__plate-label">持有人 HOLDER</span>
+            <strong>{form.nameZh || form.nameEn || '你的名字'}</strong>
+            <span className="coverart__plate-sub">{form.unit || form.group || '深資童軍團'}</span>
+          </div>
+        </div>
       </div>
 
-      <div className="welcome__card">
-        <div className="welcome__foil">
-          <Crest size={58} />
-          <p className="welcome__assoc">{isEn ? 'Scout Association of Hong Kong' : '香港童軍總會 · 深資童軍支部'}</p>
-          <h1>{isEn ? 'Venture Scout Record Book' : '深資童軍電子紀錄冊'}</h1>
-          <p className="welcome__lead">
-            {isEn
-              ? 'Page-for-page digital edition (pp. 1–40, 2026 11th Edition Syllabus). No login, no cloud upload — everything stays on your device.'
-              : '逐頁對應紙本第 1–40 頁及 2026 年第十一版訓練綱要。毋須註冊登入、絕不上傳個人資料，離線露營照常填寫、手寫簽名及一鍵生成 PT/65・PT/19・PT/20。'}
-          </p>
+      <div className="welcome__panel">
+        <div className="welcome__brand">
+          <Crest size={30} />
+          <span>
+            <strong>VSBOOK</strong>
+            <em>深資童軍紀錄冊</em>
+          </span>
         </div>
 
-        <form className="welcome__form" onSubmit={createBlank}>
-          <div className="welcome__fields">
-            <label>
-              <span>{isEn ? 'Chinese Name (Optional)' : '中文姓名（可稍後填）'}</span>
-              <input type="text" value={nameZh} onChange={(e) => setNameZh(e.target.value)} placeholder="例如：張芷晴" />
+        <h1>這本紀錄冊，是你的。</h1>
+        <p className="welcome__lede">
+          不需要帳號、不需要登入。整本冊子存在你這部裝置；逐頁點擊就可以填寫，領袖可以即場簽名，
+          亦可以生成二維碼讓領袖查看你選擇分享的章節並回簽。
+        </p>
+
+        <form className="welcome__form" onSubmit={create}>
+          <div className="welcome__row">
+            <label className="field">
+              <span className="field__label">姓名（中文）</span>
+              <input className="welcome__input" value={form.nameZh} onChange={set('nameZh')} placeholder="張芷晴" required />
             </label>
-            <label>
-              <span>{isEn ? 'Scout ID (Optional)' : '童軍成員編號 Scout ID'}</span>
-              <input type="text" value={scoutId} onChange={(e) => setScoutId(e.target.value)} placeholder="例如：25081420" />
-            </label>
-            <label>
-              <span>{isEn ? 'Scout Group (Optional)' : '所屬童軍旅'}</span>
-              <input type="text" value={group} onChange={(e) => setGroup(e.target.value)} placeholder="例如：港島第 28 旅" />
+            <label className="field">
+              <span className="field__label">姓名（英文）</span>
+              <input className="welcome__input" value={form.nameEn} onChange={set('nameEn')} placeholder="CHEUNG Tsz-ching" />
             </label>
           </div>
-          <button type="submit" className="btn btn--gold btn--block">
-            <Icon name="book" size={16} /> {isEn ? 'Create My Venture Record Book' : '建立我的深資童軍紀錄冊'}
-          </button>
+          <div className="welcome__row">
+            <label className="field">
+              <span className="field__label">
+                紀錄冊編號 <em>＝ 童軍成員編號 SCOUT ID（vsbadge 同一個號碼）</em>
+              </span>
+              <input
+                className="welcome__input"
+                value={form.scoutId}
+                onChange={(e) => setForm((f) => ({ ...f, scoutId: e.target.value }))}
+                placeholder="25081420"
+              />
+            </label>
+            <label className="field">
+              <span className="field__label">旅 Group</span>
+              <input className="welcome__input" value={form.group} onChange={set('group')} placeholder="港島第 28 旅" />
+            </label>
+          </div>
+          <div className="welcome__row">
+            <label className="field">
+              <span className="field__label">深資童軍團 Unit</span>
+              <input className="welcome__input" value={form.unit} onChange={set('unit')} placeholder="港島第 28 旅深資童軍團" />
+            </label>
+            <label className="field">
+              <span className="field__label">區 District</span>
+              <input className="welcome__input" value={form.district} onChange={set('district')} placeholder="灣仔區" />
+            </label>
+          </div>
+
+          <div className="welcome__actions">
+            <button className="btn btn--gold btn--lg" type="submit">
+              <Icon name="book" size={17} /> 建立我的紀錄冊
+            </button>
+            <button
+              type="button"
+              className="btn btn--onpaper"
+              onClick={() => {
+                start(demoBook(), '/p/contents');
+                push('已載入示範紀錄冊');
+              }}
+            >
+              用示範資料看看
+            </button>
+            <button type="button" className="btn btn--onpaper" onClick={() => fileRef.current?.click()}>
+              匯入備份
+            </button>
+            {onLeaderScan && (
+              <button type="button" className="btn btn--onpaper" onClick={onLeaderScan}>
+                <Icon name="qr" size={15} /> 領袖掃描核簽
+              </button>
+            )}
+          </div>
+          <p className="welcome__fine">
+            沒有「註冊」或「登入」。資料留在這部裝置；換機前請在選單匯出備份。
+          </p>
+          <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={(e) => importFile(e.target.files?.[0])} />
         </form>
-
-        <div className="welcome__alt">
-          <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={handleImport} />
-          <button type="button" className="btn btn--ghost" onClick={() => fileRef.current?.click()}>
-            <Icon name="upload" size={15} /> {isEn ? 'Import Backup / vsbadge JSON' : '匯入備份或 vsbadge JSON'}
-          </button>
-          <button
-            type="button"
-            className="btn btn--ghost"
-            onClick={() => {
-              onReady(demoBook());
-              push(isEn ? 'Loaded sample Venture Scout book' : '已載入示範紀錄冊（張芷晴 · 港島第 28 旅）');
-            }}
-          >
-            <Icon name="verified" size={15} /> {isEn ? 'Try Sample Book' : '載入示範紀錄冊體驗'}
-          </button>
-          <button type="button" className="btn btn--ghost" onClick={onLeaderScan}>
-            <Icon name="camera" size={15} /> {isEn ? 'Leader Mode: Scan Member QR' : '領袖模式：直接掃描成員二維碼'}
-          </button>
-        </div>
-
-        <LegalNote compact className="welcome__legal" />
       </div>
     </div>
   );

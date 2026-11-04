@@ -1,7 +1,7 @@
 import React from 'react';
 import { ITEM_INDEX, today } from '@shared/book.js';
 import { useBook, useField } from '../bookContext.js';
-import { Area, AssessTable, Bilingual, CircleChoice, Grid, H, Line, P, Page, Sig } from '../components/Form.jsx';
+import { Area, AssessTable, BadgeArt, Bilingual, CircleChoice, Grid, H, Line, P, Page, Sig } from '../components/Form.jsx';
 import Write from '../components/Write.jsx';
 import { Icon } from '../ui.jsx';
 import { Link } from '../router.jsx';
@@ -14,9 +14,12 @@ import { useLang } from '../i18n.jsx';
 export function P09() {
   return (
     <Page id="p09" dense>
-      <H en="MEMBERSHIP BADGE" progress={['L1-ACT-01', 'L1-UND-01', 'L1-UND-02', 'L1-UND-03', 'L1-UND-04', 'L1-UND-05', 'L1-ETQ-01', 'L1-ETQ-02']}>
-        會員章
-      </H>
+      <div className="pgbanner">
+        <BadgeArt src="/img/badge-membership.png" sm />
+        <H en="MEMBERSHIP BADGE" progress={['L1-ACT-01', 'L1-UND-01', 'L1-UND-02', 'L1-UND-03', 'L1-UND-04', 'L1-UND-05', 'L1-ETQ-01', 'L1-ETQ-02']}>
+          會員章
+        </H>
+      </div>
 
       <AssessTable
         title="活動"
@@ -138,7 +141,10 @@ export function P11() {
 
   return (
     <Page id="p11" dense>
-      <H en="VENTURE SCOUT EPAULETTES">深資童軍肩章</H>
+      <div className="pgbanner">
+        <BadgeArt src="/img/badge-epaulettes.png" ep sm />
+        <H en="VENTURE SCOUT EPAULETTES">深資童軍肩章</H>
+      </div>
       <Bilingual as="h3" className="secsub" zh="甲. 認識" en="A. Understanding" />
 
       <div className="exemptbox">
@@ -280,7 +286,10 @@ export function P14() {
 
   return (
     <Page id="p14">
-      <H en="PROJECT BADGE">活動策劃段章</H>
+      <div className="pgbanner">
+        <BadgeArt src="/img/badge-project.png" />
+        <H en="PROJECT BADGE">活動策劃段章</H>
+      </div>
       <P en="Complete a Venture Scout Executive Committee Workshop organised by the District, Region, or Association Headquarters.">
         完成一個由區／地域／總會認許之「深資童軍執行委員會工作坊」。
       </P>
@@ -329,7 +338,10 @@ export function P15() {
 
   return (
     <Page id="p15" dense>
-      <H en="SERVICE BADGE">社會服務段章</H>
+      <div className="pgbanner">
+        <BadgeArt src="/img/badge-service.png" sm />
+        <H en="SERVICE BADGE">社會服務段章</H>
+      </div>
 
       <Bilingual as="h3" className="secsub" zh="選修部份 (I)" en="Elective Component (I)" />
       <CircleChoice
@@ -448,7 +460,10 @@ export function P16() {
   const [cat] = useField('pages.p16.category', '');
   return (
     <Page id="p16">
-      <H en="ACTIVITY BADGE">多元技能段章</H>
+      <div className="pgbanner">
+        <BadgeArt src="/img/badge-activity.png" />
+        <H en="ACTIVITY BADGE">多元技能段章</H>
+      </div>
       <CircleChoice
         path="pages.p16.category"
         options={[
@@ -517,7 +532,10 @@ export function P18() {
 
   return (
     <Page id="p18">
-      <H en="EXPLORATION BADGE">戶外探險段章</H>
+      <div className="pgbanner">
+        <BadgeArt src="/img/badge-exploration.png" />
+        <H en="EXPLORATION BADGE">戶外探險段章</H>
+      </div>
       <div className="subselect">
         <label>
           <span>{isEn ? 'Selected Item (Expedition Type)' : '所選項目 Selected Item'}</span>
@@ -598,7 +616,10 @@ export function P20() {
 
   return (
     <Page id="p20" dense>
-      <H en="VENTURE SCOUT AWARD">深資童軍獎章</H>
+      <div className="pgbanner">
+        <BadgeArt src="/img/badge-vsa.png" />
+        <H en="VENTURE SCOUT AWARD">深資童軍獎章</H>
+      </div>
 
       <div className="awardbox">
         <Grid cols={3}>
@@ -634,7 +655,10 @@ export function P20() {
 export function P21() {
   return (
     <Page id="p21">
-      <H en="PROJECT BAR">活動策劃金帶</H>
+      <div className="pgbanner">
+        <BadgeArt src="/img/badge-project.png" bar />
+        <H en="PROJECT BAR">活動策劃金帶</H>
+      </div>
       <CircleChoice
         label="考驗方式"
         en="Project Option"
@@ -698,7 +722,10 @@ export function P22() {
 export function P23() {
   return (
     <Page id="p23">
-      <H en="SERVICE BAR">社會服務金帶</H>
+      <div className="pgbanner">
+        <BadgeArt src="/img/badge-service.png" bar />
+        <H en="SERVICE BAR">社會服務金帶</H>
+      </div>
       <CircleChoice
         path="pages.p23.selectedItem"
         options={[
@@ -762,7 +789,10 @@ export function P25() {
   const [cat] = useField('pages.p25.category', '');
   return (
     <Page id="p25">
-      <H en="ACTIVITY BAR · CATEGORY I">多元技能金帶（第一範疇）</H>
+      <div className="pgbanner">
+        <BadgeArt src="/img/badge-activity.png" bar />
+        <H en="ACTIVITY BAR · CATEGORY I">多元技能金帶（第一範疇）</H>
+      </div>
       <CircleChoice
         path="pages.p25.category"
         options={[
@@ -830,7 +860,10 @@ export function P27() {
 
   return (
     <Page id="p27">
-      <H en="ACTIVITY BAR · CATEGORY II">多元技能金帶（第二範疇）</H>
+      <div className="pgbanner">
+        <BadgeArt src="/img/badge-activity.png" bar />
+        <H en="ACTIVITY BAR · CATEGORY II">多元技能金帶（第二範疇）</H>
+      </div>
       <CircleChoice
         path="pages.p27.category"
         options={[
@@ -905,7 +938,10 @@ export function P29() {
 
   return (
     <Page id="p29">
-      <H en="EXPLORATION BAR">戶外探險金帶</H>
+      <div className="pgbanner">
+        <BadgeArt src="/img/badge-exploration.png" bar />
+        <H en="EXPLORATION BAR">戶外探險金帶</H>
+      </div>
       <div className="subselect">
         <label>
           <span>{isEn ? 'Selected Item (4-Day 3-Night Expedition)' : '所選項目 Selected Item（四日三夜或以上旅程）'}</span>
@@ -1005,7 +1041,10 @@ export function P33() {
   const { isEn } = useLang();
   return (
     <Page id="p33">
-      <H en="DRAGON SCOUT AWARD">榮譽童軍獎章</H>
+      <div className="pgbanner">
+        <BadgeArt src="/img/badge-dsa.png" />
+        <H en="DRAGON SCOUT AWARD">榮譽童軍獎章</H>
+      </div>
       <div className="awardbox">
         <Grid cols={2}>
           <Line label="完成日期" en="Date of Completion" type="date" path="pages.p33.completedDate" />

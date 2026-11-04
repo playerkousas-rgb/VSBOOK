@@ -1,6 +1,6 @@
 /* VSBOOK Service Worker — 確保露營、遠足及離線集會現場仍可完整開啟與讀寫紀錄冊。 */
 
-const CACHE_NAME = 'vsbook-cache-r1';
+const CACHE_NAME = 'vsbook-cache-r2';
 const SHELL = [
   '/',
   '/index.html',
@@ -13,6 +13,19 @@ const SHELL = [
   '/icons/icon-512.png',
   '/icons/icon-maskable-192.png',
   '/icons/icon-maskable-512.png',
+  '/img/crest-venture.png',
+  '/img/badge-membership.png',
+  '/img/badge-epaulettes.png',
+  '/img/badge-project.png',
+  '/img/badge-service.png',
+  '/img/badge-activity.png',
+  '/img/badge-exploration.png',
+  '/img/badge-vsa.png',
+  '/img/badge-dsa.png',
+  '/img/badge-swa.png',
+  '/img/badge-firstaid.png',
+  '/img/badge-rover-link.png',
+  '/img/bar-gold.png',
 ];
 
 self.addEventListener('install', (event) => {
@@ -80,7 +93,12 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(networkFirstNav(req));
     return;
   }
-  if (url.pathname.startsWith('/assets/') || url.pathname.startsWith('/icons/') || url.pathname === '/manifest.webmanifest') {
+  if (
+    url.pathname.startsWith('/assets/') ||
+    url.pathname.startsWith('/icons/') ||
+    url.pathname.startsWith('/img/') ||
+    url.pathname === '/manifest.webmanifest'
+  ) {
     event.respondWith(cacheFirstStatic(req));
   }
 });

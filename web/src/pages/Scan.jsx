@@ -228,8 +228,6 @@ export function Scan({ hasBook = true }) {
       )}
 
       {error && status !== 'blocked' && <p className="form-error">{error}</p>}
-
-      <LegalNote compact className="scan__legal" />
     </div>
   );
 }

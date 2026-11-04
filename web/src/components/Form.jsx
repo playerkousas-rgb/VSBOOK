@@ -42,6 +42,29 @@ function ProgressPill({ ids }) {
   );
 }
 
+/** 官方紀錄冊內頁之獎章／金帶插圖（正片疊底融入象牙紙面） */
+export function BadgeArt({ src, bar = false, ep = false, sm = false, caption, en }) {
+  return (
+    <div className="awardart-wrap">
+      <div className={cx('awardart', sm && 'awardart--sm')}>
+        {bar && <img className="awardart__bar" src="/img/bar-gold.png" alt="" aria-hidden="true" />}
+        <img
+          className={cx('awardart__img', ep && 'awardart__img--ep', sm && 'awardart__img--sm')}
+          src={src}
+          alt={caption || ''}
+          aria-hidden={caption ? undefined : 'true'}
+        />
+      </div>
+      {caption && (
+        <p className="awardart__cap">
+          {caption}
+          {en && <em>{en}</em>}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function P({ children, en, className = '' }) {
   const { isEn } = useLang();
   if (isEn && en) {
@@ -173,7 +196,7 @@ export function CircleChoice({ label = '所選項目（請圈出）', en = 'Sele
   );
 }
 
-/** 會員章及肩章細項簽核表（項目 Items | 主考 Initials / 簽名 | 日期 Date） */
+/** 會員章及肩章細項簽核表（對齊紙本三欄：項目｜主考｜日期，無自創勾選框） */
 export function AssessTable({ title, en, items, exempted = false }) {
   const { book, update } = useBook();
   const { isEn } = useLang();
@@ -195,28 +218,20 @@ export function AssessTable({ title, en, items, exempted = false }) {
         <div className="asstable__cat">
           <strong>{isEn && en ? en : title}</strong>
           {!isEn && en && <em>{en}</em>}
-          {exempted && <span className="asstable__exempttag">{isEn ? 'Exempted by Link / Standard Badge' : '已憑先修章／標準獎章豁免'}</span>}
+          {exempted && <span className="asstable__exempttag">{isEn ? 'Exempted' : '已獲豁免'}</span>}
         </div>
       )}
       <div className="asstable__head">
-        <span className="asstable__c-item">{isEn ? 'Items' : '項目 Items'}</span>
-        <span className="asstable__c-init">{isEn ? 'Initials' : '主考 Initials'}</span>
-        <span className="asstable__c-date">{isEn ? 'Date' : '日期 Date'}</span>
+        <span className="asstable__c-item">{isEn ? 'Items' : '項目'}</span>
+        <span className="asstable__c-init">{isEn ? 'Initials' : '主考'}</span>
+        <span className="asstable__c-date">{isEn ? 'Date' : '日期'}</span>
       </div>
       {items.map((it) => {
         const st = book.progress?.[it.id] || {};
-        const done = Boolean(st.date) || exempted;
+        const done = Boolean(st.date || st.assessor) || exempted;
         return (
           <div key={it.id} className={cx('assrow', done && 'is-done')}>
             <div className="assrow__item">
-              <button
-                type="button"
-                className="itemline__tick"
-                onClick={() => setEntry(it.id, { date: st.date ? '' : today() })}
-                aria-label={st.date ? '取消完成' : '標記完成'}
-              >
-                {done ? '✓' : ''}
-              </button>
               <div className="assrow__text">
                 <span>
                   {it.no && <b className="assrow__no">({it.no}) </b>}
@@ -226,7 +241,7 @@ export function AssessTable({ title, en, items, exempted = false }) {
               </div>
             </div>
 
-            <div className="assrow__init" data-col={isEn ? 'Initials' : '主考'}>
+            <div className="assrow__init" data-label={isEn ? 'Initials' : '主考'}>
               {st.signature?.png ? (
                 <button type="button" className="assrow__sigbtn" onClick={() => setSignItem(it)} title={st.assessor || '主考簽名'}>
                   <img src={st.signature.png} alt="簽名" />
@@ -238,12 +253,12 @@ export function AssessTable({ title, en, items, exempted = false }) {
                     value={st.assessor || ''}
                     onChange={(v) => setEntry(it.id, { assessor: v })}
                     compact
-                    placeholder={isEn ? 'Initials' : '主考姓名'}
+                    placeholder={isEn ? 'Initials' : '主考'}
                     label={`${it.no || ''} 主考`}
                   />
                   <button
                     type="button"
-                    className="assrow__pen"
+                    className="assrow__pen no-print"
                     onClick={() => setSignItem(it)}
                     title={isEn ? 'Handwrite initials' : '手寫簽名'}
                     aria-label={isEn ? 'Sign initials' : '主考手寫簽名'}
@@ -254,7 +269,7 @@ export function AssessTable({ title, en, items, exempted = false }) {
               )}
             </div>
 
-            <div className="assrow__date" data-col={isEn ? 'Date' : '日期'}>
+            <div className="assrow__date" data-label={isEn ? 'Date' : '日期'}>
               <Write
                 value={st.date || ''}
                 onChange={(d) => setEntry(it.id, { date: d })}
@@ -288,8 +303,8 @@ export function AssessTable({ title, en, items, exempted = false }) {
   );
 }
 
-/** 通用增減列數表格（第 2、3、36、37、38、39、40 頁） */
-export function Rows({ path, cols, min = 4, addLabel, del = true, dense = false, cap }) {
+/** 紙本表格（預設不顯示自創刪除鍵，手機自動展開為欄名在上、值在下） */
+export function Rows({ path, cols, min = 4, addLabel = null, del = false, dense = false, cap }) {
   const [stored, set] = useField(path, []);
   const { isEn } = useLang();
   const list = Array.isArray(stored) ? stored : [];
@@ -323,7 +338,7 @@ export function Rows({ path, cols, min = 4, addLabel, del = true, dense = false,
             <span
               className="pgtable__cell"
               key={c.k}
-              data-label={isEn ? c.en || c.label : c.label}
+              data-label={isEn ? c.en || englishOf(c.label) || termFor('en', c.label) : c.label}
               style={c.width ? { flex: c.width } : undefined}
             >
               <Write
@@ -339,7 +354,7 @@ export function Rows({ path, cols, min = 4, addLabel, del = true, dense = false,
             </span>
           ))}
           {del && (
-            <span className="pgtable__delcol">
+            <span className="pgtable__delcol no-print">
               {list[index] && (
                 <button type="button" className="rowdel" onClick={() => removeRow(index)} aria-label={isEn ? 'Delete row' : '刪除此列'}>
                   ×
@@ -351,7 +366,7 @@ export function Rows({ path, cols, min = 4, addLabel, del = true, dense = false,
       ))}
 
       {addLabel !== null && (!cap || list.length < cap) && (
-        <button type="button" className="addrow" onClick={add}>
+        <button type="button" className="addrow no-print" onClick={add}>
           + {addLabelFor(isEn ? 'en' : 'zh', addLabel || '加一行')}
         </button>
       )}

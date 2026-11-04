@@ -29,17 +29,6 @@ const PAGES = {
   appendix: AppendixPage,
 };
 
-function readInitialView() {
-  try {
-    const saved = localStorage.getItem('vsbook.view');
-    if (saved === 'card' || saved === 'paper') return saved;
-  } catch {
-    /* ignore */
-  }
-  if (typeof window !== 'undefined' && window.innerWidth <= 520) return 'card';
-  return 'paper';
-}
-
 function BookApp({ book, saveIssue }) {
   const path = useRoute();
   const { push } = useToast();
@@ -48,23 +37,10 @@ function BookApp({ book, saveIssue }) {
   const [qrOpen, setQrOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
-  const [viewMode, setViewMode] = useState(readInitialView);
   const [savedAt, setSavedAt] = useState(null);
   const [online, setOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine));
   const [updateReady, setUpdateReady] = useState(false);
   const touch = useRef(null);
-
-  const toggleView = () => {
-    setViewMode((prev) => {
-      const next = prev === 'card' ? 'paper' : 'card';
-      try {
-        localStorage.setItem('vsbook.view', next);
-      } catch {
-        /* ignore */
-      }
-      return next;
-    });
-  };
 
   useEffect(() => {
     const on = () => setOnline(true);
@@ -102,6 +78,10 @@ function BookApp({ book, saveIssue }) {
     }
     setLastSection(section);
   }, [section]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') window.scrollTo?.({ top: 0, behavior: 'instant' });
+  }, [path]);
 
   useEffect(() => {
     const t = setTimeout(() => setSavedAt(new Date()), 350);
@@ -142,7 +122,6 @@ function BookApp({ book, saveIssue }) {
         'app',
         printAll ? 'app--print' : scanPath ? 'app--scan' : formId ? 'app--forms' : section ? 'app--book' : 'app--cover',
       )}
-      data-view={viewMode}
     >
       <header className={cx('chipbar no-print', section && 'chipbar--page')}>
         <Link to="/" className="chipbar__brand">
@@ -155,14 +134,36 @@ function BookApp({ book, saveIssue }) {
 
         {formId && (
           <span className="chipbar__page chipbar__page--static">
-            <span>{isEn ? 'FORMS' : '官方表格'}</span>
-            <strong>{formId === 'index' ? (isEn ? '3 Forms' : '三張表格') : formId === 'all' ? (isEn ? 'All 3' : '全部三張') : `PT/${formId.slice(2)}`}</strong>
+            <span>{isEn ? 'FORMS' : '申請表'}</span>
+            <strong>
+              {formId === 'index'
+                ? isEn
+                  ? '3 Forms'
+                  : '三張表格'
+                : formId === 'all'
+                  ? isEn
+                    ? 'All 3'
+                    : '全部三張'
+                  : `PT/${formId.slice(2)}`}
+            </strong>
           </span>
         )}
 
         {section && (
           <button type="button" className="chipbar__page" onClick={() => setIndexOpen(true)}>
-            <span>{meta?.page === '—' ? (isEn ? 'Digital' : '數位') : isEn ? `P.${meta?.page}` : `第 ${meta?.page} 頁`}</span>
+            <span>
+              {meta?.page === '—'
+                ? meta?.id === 'contents'
+                  ? isEn
+                    ? 'Contents'
+                    : '目錄'
+                  : isEn
+                    ? 'Appendix'
+                    : '附錄'
+                : isEn
+                  ? `Page ${meta?.page}`
+                  : `第 ${meta?.page} 頁`}
+            </span>
             <strong>{isEn ? meta?.en || meta?.label : meta?.label}</strong>
             <Icon name="down" size={12} />
           </button>
@@ -171,31 +172,19 @@ function BookApp({ book, saveIssue }) {
         <div className="chipbar__actions">
           {section && (
             <span className={cx('chipbar__save hide-sm', saveIssue && 'is-error')}>
-              {saveIssue ? (isEn ? 'UNSAVED' : '未儲存') : savedAt ? (isEn ? 'SAVED' : '已存本機') : 'LOCAL'}
+              {saveIssue ? (isEn ? 'UNSAVED' : '未儲存') : savedAt ? (isEn ? 'SAVED' : '已儲存') : 'LOCAL'}
             </span>
           )}
 
           {section && (
-            <>
-              <button
-                type="button"
-                className={cx('chipbtn', viewMode === 'card' && 'is-on')}
-                onClick={toggleView}
-                title={isEn ? 'Switch Paper / Card View' : '切換紙本原貌／手機單欄卡片'}
-              >
-                <Icon name={viewMode === 'card' ? 'book' : 'cards'} size={15} />
-                <span className="hide-sm">{viewMode === 'card' ? (isEn ? 'Paper' : '紙本') : isEn ? 'Card' : '卡片'}</span>
-              </button>
-
-              <button
-                type="button"
-                className={cx('chipbtn hide-sm', zoom > 1 && 'is-on')}
-                onClick={() => setZoom((z) => (z > 1 ? 1 : 1.25))}
-                title={isEn ? 'Zoom' : '放大檢視'}
-              >
-                <Icon name="zoom" size={15} />
-              </button>
-            </>
+            <button
+              type="button"
+              className={cx('chipbtn hide-sm', zoom > 1 && 'is-on')}
+              onClick={() => setZoom((z) => (z > 1 ? 1 : 1.4))}
+              title={isEn ? 'Zoom' : '放大紙面（方便細字填寫）'}
+            >
+              <Icon name="zoom" size={15} /> {zoom > 1 ? (isEn ? 'Reset' : '還原') : isEn ? 'Zoom' : '放大'}
+            </button>
           )}
 
           <button type="button" className="chipbtn chipbtn--gold" onClick={() => setQrOpen(true)}>
@@ -206,9 +195,10 @@ function BookApp({ book, saveIssue }) {
             type="button"
             className="chipbtn chipbtn--lang"
             onClick={toggle}
-            aria-label={isEn ? 'Switch to Chinese' : '切換英文'}
+            title={isEn ? '切換至中文介面' : 'Switch to English'}
+            aria-label={isEn ? '切換至中文介面' : 'Switch to English'}
           >
-            <span>{isEn ? '中' : 'EN'}</span>
+            <Icon name="globe" size={14} /> <span>{isEn ? '中文' : 'EN'}</span>
           </button>
 
           <button type="button" className="chipbtn chipbtn--icon" onClick={() => setMenuOpen(true)} aria-label="選單">
@@ -285,7 +275,9 @@ function BookApp({ book, saveIssue }) {
               <FormDoc id={formId} />
             )
           ) : PageComp ? (
-            <PageComp />
+            <div className="turn" key={section}>
+              <PageComp />
+            </div>
           ) : (
             <CoverPage
               book={book}
@@ -295,7 +287,6 @@ function BookApp({ book, saveIssue }) {
               }}
               last={lastMeta}
               onContinue={() => lastMeta && navigate(`/p/${lastMeta.id}`)}
-              onShowQr={() => setQrOpen(true)}
             />
           )}
         </div>
@@ -305,11 +296,10 @@ function BookApp({ book, saveIssue }) {
 
       {!section && !printAll && !scanPath && !formId && (
         <div className="coverhint no-print">
-          <span className="coverhint__dot" />
           <span>
             {isEn
               ? `${PAGE_TOTAL} official pages · Offline-first · Zero server upload`
-              : `對應紙本共 ${PAGE_TOTAL} 頁 · 離線優先 · 零伺服器上傳`}
+              : `對應紙本共 ${PAGE_TOTAL} 頁 · 點「打開紀錄冊」或按 → 翻開`}
           </span>
         </div>
       )}
@@ -332,9 +322,6 @@ function BookApp({ book, saveIssue }) {
           setMenuOpen(false);
           setQrOpen(true);
         }}
-        onOpenIndex={() => setIndexOpen(true)}
-        viewMode={viewMode}
-        onToggleView={toggleView}
       />
     </div>
   );

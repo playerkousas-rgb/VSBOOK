@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   FORM_META,
   FORM_ORDER,
@@ -12,7 +12,15 @@ import Write from '../components/Write.jsx';
 import { Icon } from '../ui.jsx';
 import { Link } from '../router.jsx';
 import { useLang } from '../i18n.jsx';
-import { LegalNote } from '../components/Legal.jsx';
+
+function usePrintPreview() {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    document.documentElement.toggleAttribute('data-print-preview', on);
+    return () => document.documentElement.removeAttribute('data-print-preview');
+  }, [on]);
+  return [on, () => setOn((v) => !v)];
+}
 
 function useFormEditor(formId) {
   const { book, update } = useBook();
@@ -111,8 +119,6 @@ export function FormsIndex() {
           );
         })}
       </div>
-
-      <LegalNote compact />
     </div>
   );
 }
@@ -649,6 +655,7 @@ function FormPT20() {
 
 export function FormDoc({ id }) {
   const { isEn } = useLang();
+  const [preview, togglePreview] = usePrintPreview();
   const meta = FORM_META[id];
   if (!meta) return <FormsIndex />;
 
@@ -665,9 +672,14 @@ export function FormDoc({ id }) {
             </Link>
           ))}
         </div>
-        <button type="button" className="btn btn--gold btn--sm" onClick={() => window.print()}>
-          <Icon name="print" size={14} /> {isEn ? 'Print A4' : 'A4 列印／存 PDF'}
-        </button>
+        <div className="formdoc__acts">
+          <button type="button" className={`btn btn--ghost btn--sm${preview ? ' is-on' : ''}`} onClick={togglePreview}>
+            {preview ? (isEn ? 'Resume Editing' : '返回填寫') : isEn ? 'Print Preview' : '預覽列印效果'}
+          </button>
+          <button type="button" className="btn btn--gold btn--sm" onClick={() => window.print()}>
+            <Icon name="print" size={14} /> {isEn ? 'Print A4' : 'A4 列印／存 PDF'}
+          </button>
+        </div>
       </div>
 
       <p className="formdoc__hint no-print">
@@ -681,6 +693,7 @@ export function FormDoc({ id }) {
 
 export function FormsAll() {
   const { isEn } = useLang();
+  const [preview, togglePreview] = usePrintPreview();
   return (
     <div className="formdoc">
       <div className="formdoc__bar no-print">
@@ -688,9 +701,14 @@ export function FormsAll() {
           <Icon name="back" size={14} /> {isEn ? 'Back' : '返回表格總覽'}
         </Link>
         <strong>{isEn ? 'All 3 Official Forms (7 A4 Pages Total)' : '全部三張官方表格（共 7 頁 A4）'}</strong>
-        <button type="button" className="btn btn--gold btn--sm" onClick={() => window.print()}>
-          <Icon name="print" size={14} /> {isEn ? 'Print All' : '一次過列印'}
-        </button>
+        <div className="formdoc__acts">
+          <button type="button" className={`btn btn--ghost btn--sm${preview ? ' is-on' : ''}`} onClick={togglePreview}>
+            {preview ? (isEn ? 'Resume Editing' : '返回填寫') : isEn ? 'Print Preview' : '預覽列印效果'}
+          </button>
+          <button type="button" className="btn btn--gold btn--sm" onClick={() => window.print()}>
+            <Icon name="print" size={14} /> {isEn ? 'Print All' : '一次過列印'}
+          </button>
+        </div>
       </div>
       <FormPT65 />
       <FormPT19 />
