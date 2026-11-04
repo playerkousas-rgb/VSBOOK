@@ -1,6 +1,6 @@
 import React from 'react';
 import { ITEM_INDEX, today } from '@shared/book.js';
-import { useBook, useField } from '../bookContext.js';
+import { useBook, useField, useReadOnly } from '../bookContext.js';
 import { Area, AssessTable, BadgeArt, Bilingual, CircleChoice, Grid, H, Line, P, Page, Sig } from '../components/Form.jsx';
 import Write from '../components/Write.jsx';
 import { Icon } from '../ui.jsx';
@@ -103,17 +103,17 @@ export function P10() {
       />
 
       <div className="orbox">
-        <span className="orbox__tag">{isEn ? 'OR' : '或 OR'}</span>
+        <span className="orbox__tag">{isEn ? 'OR' : '或'}</span>
         <div className="orbox__row">
           <span>
             {isEn
               ? '(12) Finish the Safe From Harm Online Learning Course — Certificate No.'
-              : '(12) 完成「保護童軍成員免受傷害」網上自學課程 —— 證書編號 Certificate No.'}
+              : '(12) 完成「保護童軍成員免受傷害」網上自學課程 —— 證書編號'}
           </span>
           <Write
             value={book.pages?.p10?.safeCertNo || ''}
             onChange={onCertChange}
-            placeholder="例如：SFH-2026-00123"
+            placeholder={isEn ? 'e.g. SFH-2026-00123' : '例如：SFH-2026-00123'}
             label="保護童軍網上自學課程證書編號"
           />
         </div>
@@ -149,13 +149,13 @@ export function P11() {
 
       <div className="exemptbox">
         <div className="exemptbox__title">
-          <strong>{isEn ? 'Obtained the Venture Scout Link Badge in the Scout Section' : '考獲深資童軍先修章 Obtained the Venture Scout Link Badge in the Scout Section'}</strong>
+          <strong>{isEn ? 'Obtained the Venture Scout Link Badge in the Scout Section' : '考獲深資童軍先修章'}</strong>
         </div>
         <Grid cols={2}>
           <Line label="證書編號" en="Certificate Number" path="pages.p11.linkCertNo" placeholder="先修章證書編號（如有可豁免甲部）" />
           <Line label="日期" en="Date" type="date" path="pages.p11.linkDate" />
         </Grid>
-        <div className="exemptbox__or">{isEn ? 'OR complete items (1)–(10) below' : '或 OR 完成下列 (1)–(10) 項'}</div>
+        <div className="exemptbox__or">{isEn ? 'OR complete items (1)–(10) below' : '或完成下列 (1)–(10) 項'}</div>
       </div>
 
       <AssessTable
@@ -189,13 +189,13 @@ export function P12() {
 
       <div className="exemptbox">
         <div className="exemptbox__title">
-          <strong>{isEn ? 'Obtained the Scout Standard Award in the Scout Section' : '考獲童軍標準獎章 Obtained the Scout Standard Award in the Scout Section'}</strong>
+          <strong>{isEn ? 'Obtained the Scout Standard Award in the Scout Section' : '考獲童軍標準獎章'}</strong>
         </div>
         <Grid cols={2}>
           <Line label="證書編號" en="Certificate Number" path="pages.p12.standardCertNo" placeholder="童軍標準獎章證書編號（如有可豁免乙部）" />
           <Line label="日期" en="Date" type="date" path="pages.p12.standardDate" />
         </Grid>
-        <div className="exemptbox__or">{isEn ? 'OR complete items (11)–(23)' : '或 OR 完成下列 (11)–(23) 項'}</div>
+        <div className="exemptbox__or">{isEn ? 'OR complete items (11)–(23)' : '或完成下列 (11)–(23) 項'}</div>
       </div>
 
       <AssessTable
@@ -281,8 +281,9 @@ function useSyncProgress() {
 }
 
 export function P14() {
+  const { isEn } = useLang();
   const sync = useSyncProgress();
-  const [, setWorkshopDate] = useField('pages.p14.workshopDate');
+  const [wsDate, setWorkshopDate] = useField('pages.p14.workshopDate');
 
   return (
     <Page id="p14">
@@ -297,13 +298,11 @@ export function P14() {
       <Grid cols={2}>
         <Line label="工作坊證書編號" en="Workshop Certificate Number" path="pages.p14.workshopCertNo" placeholder="例如：VSEC-2026-048" />
         <div className="frow">
-          <span className="frow__label">
-            日期 <em>Date</em>
-          </span>
+          <span className="frow__label">{isEn ? 'Date' : '日期'}</span>
           <span className="frow__value">
             <Write
               type="date"
-              value={useField('pages.p14.workshopDate')[0]}
+              value={wsDate}
               onChange={(d) => {
                 setWorkshopDate(d);
                 sync('L3-PROJECT-01', d);
@@ -332,6 +331,7 @@ export function P14() {
 
 export function P15() {
   const { book } = useBook();
+  const { isEn } = useLang();
   const sync = useSyncProgress();
   const [p1Date, setP1Date] = useField('pages.p15.part1Date');
   const [p2Date, setP2Date] = useField('pages.p15.part2Date');
@@ -355,9 +355,7 @@ export function P15() {
       <Grid cols={2}>
         <Line label="證書編號" en="Certificate Number" path="pages.p15.part1CertNo" />
         <div className="frow">
-          <span className="frow__label">
-            日期 <em>Date</em>
-          </span>
+          <span className="frow__label">{isEn ? 'Date' : '日期'}</span>
           <span className="frow__value">
             <Write
               type="date"
@@ -391,9 +389,7 @@ export function P15() {
       <Grid cols={2}>
         <Line label="證書編號" en="Certificate Number" path="pages.p15.part2CertNo" />
         <div className="frow">
-          <span className="frow__label">
-            日期 <em>Date</em>
-          </span>
+          <span className="frow__label">{isEn ? 'Date' : '日期'}</span>
           <span className="frow__value">
             <Write
               type="date"
@@ -436,6 +432,7 @@ const ACT_SUBS = {
 
 function SubItemSelect({ level, category, path }) {
   const [val, setVal] = useField(path, '');
+  const readOnly = useReadOnly();
   const { isEn } = useLang();
   const ids = ACT_SUBS[level]?.[category] || [];
   if (!ids.length) return null;
@@ -443,7 +440,7 @@ function SubItemSelect({ level, category, path }) {
     <div className="subselect">
       <label>
         <span>{isEn ? '11th Ed. Specific Syllabus Option (syncs with vsbadge)' : '對應第十一版綱要細項（與 vsbadge 自動同步）'}</span>
-        <select value={val} onChange={(e) => setVal(e.target.value)}>
+        <select value={val} onChange={(e) => setVal(e.target.value)} disabled={readOnly}>
           <option value="">{isEn ? '— Select sub-option —' : '— 請選擇細項 —'}</option>
           {ids.map((id) => (
             <option key={id} value={id}>
@@ -486,6 +483,7 @@ export function P16() {
 
 export function P17() {
   const { book } = useBook();
+  const { isEn } = useLang();
   const sync = useSyncProgress();
   const [doneDate, setDoneDate] = useField('pages.p17.completedDate');
 
@@ -503,9 +501,7 @@ export function P17() {
         <Sig label="簽署" en="Signature" path="pages.p17.assessorSig" />
         <Grid cols={2}>
           <div className="frow">
-            <span className="frow__label">
-              完成日期 <em>Date of Completion</em>
-            </span>
+            <span className="frow__label">{isEn ? 'Date of Completion' : '完成日期'}</span>
             <span className="frow__value">
               <Write
                 type="date"
@@ -527,6 +523,7 @@ export function P17() {
 
 export function P18() {
   const [sel, setSel] = useField('pages.p18.selectedItem', '');
+  const readOnly = useReadOnly();
   const { isEn } = useLang();
   const expIds = ['L3-EXP-V11-HIKING', 'L3-EXP-V11-CYCLING', 'L3-EXP-V11-DRIVING', 'L3-EXP-V11-MECHANICAL', 'L3-EXP-V11-SEA'];
 
@@ -538,8 +535,8 @@ export function P18() {
       </div>
       <div className="subselect">
         <label>
-          <span>{isEn ? 'Selected Item (Expedition Type)' : '所選項目 Selected Item'}</span>
-          <select value={sel} onChange={(e) => setSel(e.target.value)}>
+          <span>{isEn ? 'Selected Item (Expedition Type)' : '所選項目'}</span>
+          <select value={sel} onChange={(e) => setSel(e.target.value)} disabled={readOnly}>
             <option value="">{isEn ? '— Choose expedition type —' : '— 請選擇戶外探險旅程類型 —'}</option>
             {expIds.map((id) => (
               <option key={id} value={id}>
@@ -569,6 +566,7 @@ export function P18() {
 
 export function P19() {
   const { book } = useBook();
+  const { isEn } = useLang();
   const sync = useSyncProgress();
   const [doneDate, setDoneDate] = useField('pages.p19.completedDate');
 
@@ -588,9 +586,7 @@ export function P19() {
         <Sig label="簽署" en="Signature" path="pages.p19.assessorSig" />
         <Grid cols={2}>
           <div className="frow">
-            <span className="frow__label">
-              完成日期 <em>Date of Completion</em>
-            </span>
+            <span className="frow__label">{isEn ? 'Date of Completion' : '完成日期'}</span>
             <span className="frow__value">
               <Write
                 type="date"
@@ -681,6 +677,7 @@ export function P21() {
 
 export function P22() {
   const { book } = useBook();
+  const { isEn } = useLang();
   const sync = useSyncProgress();
   const [doneDate, setDoneDate] = useField('pages.p22.completedDate');
 
@@ -697,9 +694,7 @@ export function P22() {
         <Sig label="簽署" en="Signature" path="pages.p22.assessorSig" />
         <Grid cols={2}>
           <div className="frow">
-            <span className="frow__label">
-              完成日期 <em>Date of Completion</em>
-            </span>
+            <span className="frow__label">{isEn ? 'Date of Completion' : '完成日期'}</span>
             <span className="frow__value">
               <Write
                 type="date"
@@ -747,6 +742,7 @@ export function P23() {
 
 export function P24() {
   const { book } = useBook();
+  const { isEn } = useLang();
   const sync = useSyncProgress();
   const [doneDate, setDoneDate] = useField('pages.p24.completedDate');
 
@@ -763,9 +759,7 @@ export function P24() {
         <Sig label="簽署" en="Signature" path="pages.p24.assessorSig" />
         <Grid cols={2}>
           <div className="frow">
-            <span className="frow__label">
-              完成日期 <em>Date of Completion</em>
-            </span>
+            <span className="frow__label">{isEn ? 'Date of Completion' : '完成日期'}</span>
             <span className="frow__value">
               <Write
                 type="date"
@@ -814,6 +808,7 @@ export function P25() {
 
 export function P26() {
   const { book } = useBook();
+  const { isEn } = useLang();
   const sync = useSyncProgress();
   const [doneDate, setDoneDate] = useField('pages.p26.completedDate');
 
@@ -830,9 +825,7 @@ export function P26() {
         <Sig label="簽署" en="Signature" path="pages.p26.assessorSig" />
         <Grid cols={2}>
           <div className="frow">
-            <span className="frow__label">
-              完成日期 <em>Date of Completion</em>
-            </span>
+            <span className="frow__label">{isEn ? 'Date of Completion' : '完成日期'}</span>
             <span className="frow__value">
               <Write
                 type="date"
@@ -893,6 +886,7 @@ export function P27() {
 
 export function P28() {
   const { book } = useBook();
+  const { isEn } = useLang();
   const sync = useSyncProgress();
   const [doneDate, setDoneDate] = useField('pages.p28.completedDate');
 
@@ -909,9 +903,7 @@ export function P28() {
         <Sig label="簽署" en="Signature" path="pages.p28.assessorSig" />
         <Grid cols={2}>
           <div className="frow">
-            <span className="frow__label">
-              完成日期 <em>Date of Completion</em>
-            </span>
+            <span className="frow__label">{isEn ? 'Date of Completion' : '完成日期'}</span>
             <span className="frow__value">
               <Write
                 type="date"
@@ -933,6 +925,7 @@ export function P28() {
 
 export function P29() {
   const [sel, setSel] = useField('pages.p29.selectedItem', '');
+  const readOnly = useReadOnly();
   const { isEn } = useLang();
   const expIds = ['L4-EXP-V11-HIKING', 'L4-EXP-V11-CYCLING', 'L4-EXP-V11-DRIVING', 'L4-EXP-V11-MECHANICAL', 'L4-EXP-V11-SEA'];
 
@@ -944,8 +937,8 @@ export function P29() {
       </div>
       <div className="subselect">
         <label>
-          <span>{isEn ? 'Selected Item (4-Day 3-Night Expedition)' : '所選項目 Selected Item（四日三夜或以上旅程）'}</span>
-          <select value={sel} onChange={(e) => setSel(e.target.value)}>
+          <span>{isEn ? 'Selected Item (4-Day 3-Night Expedition)' : '所選項目（四日三夜或以上旅程）'}</span>
+          <select value={sel} onChange={(e) => setSel(e.target.value)} disabled={readOnly}>
             <option value="">{isEn ? '— Choose Exploration Bar expedition —' : '— 請選擇戶外探險金帶旅程 —'}</option>
             {expIds.map((id) => (
               <option key={id} value={id}>
@@ -967,6 +960,7 @@ export function P29() {
 
 export function P30() {
   const { book } = useBook();
+  const { isEn } = useLang();
   const sync = useSyncProgress();
   const [doneDate, setDoneDate] = useField('pages.p30.completedDate');
 
@@ -985,9 +979,7 @@ export function P30() {
         <Sig label="簽署" en="Signature" path="pages.p30.assessorSig" />
         <Grid cols={2}>
           <div className="frow">
-            <span className="frow__label">
-              完成日期 <em>Date of Completion</em>
-            </span>
+            <span className="frow__label">{isEn ? 'Date of Completion' : '完成日期'}</span>
             <span className="frow__value">
               <Write
                 type="date"

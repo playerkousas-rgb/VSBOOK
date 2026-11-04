@@ -5,15 +5,15 @@ import { useLang } from '../i18n.jsx';
 import { LegalLine } from '../components/Legal.jsx';
 
 /**
- * 全幅深資童軍酒紅布面燙金封面（對齊 ROVERBOOK .coverart 結構，色系改為深資童軍紅）：
+ * 全幅深資童軍酒紅布面燙金封面（對齊 ROVERBOOK v16 .coverart 結構，中英完全分開）：
  * 全書唯一一行非官方版權細字置於封面最底（附錄及選單「關於」保留完整版）。
  */
-export default function CoverPage({ book, onOpen, last, onContinue }) {
+export default function CoverPage({ book, onOpen, last, onContinue, onLeader }) {
   const { isEn } = useLang();
   const m = book?.member || {};
   const stats = allStats(book);
 
-  const hint = !m.nameZh
+  const hint = !m.nameZh && !m.nameEn
     ? isEn
       ? 'Step 1: write your name on Page 1'
       : '第一步：寫上你的名字'
@@ -25,9 +25,9 @@ export default function CoverPage({ book, onOpen, last, onContinue }) {
 
   const medals = [
     { id: 'L1', label: isEn ? 'Membership Badge' : '會員章', short: isEn ? 'MB' : '會', earned: Boolean(book?.pages?.p10?.investitureDate || stats.badges[0]?.percent === 100) },
-    { id: 'L2', label: isEn ? 'Epaulettes' : '深資童軍肩章', short: isEn ? 'EP' : '肩', earned: Boolean(book?.pages?.p13?.completionDate || stats.badges[1]?.percent === 100) },
-    { id: 'L3', label: isEn ? 'Venture Scout Award' : '深資童軍獎章', short: isEn ? 'VS' : '深', earned: Boolean(book?.pages?.p20?.completionDate || stats.badges[2]?.percent === 100) },
-    { id: 'L4', label: isEn ? 'Dragon Scout Award' : '榮譽童軍獎章', short: isEn ? 'DS' : '榮', earned: Boolean(book?.pages?.p33?.completionDate || stats.badges[3]?.percent === 100) },
+    { id: 'L2', label: isEn ? 'Epaulettes' : '深資童軍肩章', short: isEn ? 'EP' : '肩', earned: Boolean(book?.pages?.p13?.completedDate || stats.badges[1]?.percent === 100) },
+    { id: 'L3', label: isEn ? 'Venture Scout Award' : '深資童軍獎章', short: isEn ? 'VS' : '深', earned: Boolean(book?.pages?.p20?.completedDate || stats.badges[2]?.percent === 100) },
+    { id: 'L4', label: isEn ? 'Dragon Scout Award' : '榮譽童軍獎章', short: isEn ? 'DS' : '榮', earned: Boolean(book?.pages?.p33?.completedDate || stats.badges[3]?.percent === 100) },
   ];
 
   return (
@@ -38,24 +38,31 @@ export default function CoverPage({ book, onOpen, last, onContinue }) {
       <span className="coverart__spine" aria-hidden="true" />
 
       <div className="coverart__top">
-        <Crest size={58} />
+        <Crest size={56} />
         <div>
           <strong>{isEn ? 'SCOUT ASSOCIATION OF HONG KONG' : '香港童軍總會'}</strong>
-          {!isEn && <em>SCOUT ASSOCIATION OF HONG KONG</em>}
         </div>
       </div>
 
       <div className="coverart__center">
         <img className="coverart__emblem" src="/img/crest-venture.png" alt="" aria-hidden="true" />
-        <span className="coverart__kicker">VENTURE SCOUT</span>
-        <h1 className="coverart__title">深資童軍</h1>
-        <h2 className="coverart__subtitle">紀　錄　冊</h2>
-        <span className="coverart__en">RECORD BOOK</span>
+        {isEn ? (
+          <>
+            <span className="coverart__kicker">VENTURE SCOUT SECTION</span>
+            <h1 className="coverart__title coverart__title--en">VENTURE SCOUT</h1>
+            <h2 className="coverart__subtitle">RECORD BOOK</h2>
+          </>
+        ) : (
+          <>
+            <h1 className="coverart__title">深資童軍</h1>
+            <h2 className="coverart__subtitle">紀　錄　冊</h2>
+          </>
+        )}
       </div>
 
       <div className="coverart__plate">
-        <span className="coverart__plate-label">{isEn ? 'HOLDER' : '持有人 HOLDER'}</span>
-        <strong>{(isEn && m.nameEn ? m.nameEn : m.nameZh) || (isEn ? 'Your Name' : '你的名字')}</strong>
+        <span className="coverart__plate-label">{isEn ? 'HOLDER' : '持有人'}</span>
+        <strong>{(isEn ? m.nameEn || m.nameZh : m.nameZh || m.nameEn) || (isEn ? 'Your Name' : '你的名字')}</strong>
         <span className="coverart__plate-sub">
           {[m.unit, m.group].filter(Boolean).join(' · ') || (isEn ? 'Venture Scout Unit' : '深資童軍團')}
         </span>
@@ -77,9 +84,16 @@ export default function CoverPage({ book, onOpen, last, onContinue }) {
       <div className="coverart__foot">
         <span className="coverart__year">{new Date().getFullYear()}</span>
         <div className="coverart__ctas">
-          <button type="button" className="coverart__open" onClick={onOpen}>
-            {isEn ? 'Open the record book' : '打開紀錄冊'}
-          </button>
+          <div className="coverart__ctarow">
+            <button type="button" className="coverart__open" onClick={onOpen}>
+              {isEn ? 'Open the record book' : '打開紀錄冊'}
+            </button>
+            {onLeader && (
+              <button type="button" className="coverart__leader" onClick={onLeader}>
+                {isEn ? 'Leader mode' : '領袖模式'}
+              </button>
+            )}
+          </div>
           {last && (
             <button type="button" className="coverart__resume" onClick={onContinue}>
               {isEn ? `Continue · page ${last.page}` : `繼續上次 · 第 ${last.page} 頁`}{' '}

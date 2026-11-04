@@ -39,8 +39,8 @@ export function Sheet({ id, no, title, en, children, className = '', dense = fal
       </div>
       <div className="sheet__body">{children}</div>
       <footer className="sheet__foot">
-        <span>SCOUT ASSOCIATION OF HONG KONG</span>
-        <span>{(en || 'CONTENTS').toUpperCase()}</span>
+        <span>{isEn ? 'SCOUT ASSOCIATION OF HONG KONG' : '香港童軍總會'}</span>
+        <span>{isEn ? (en || 'CONTENTS').toUpperCase() : title || '目錄'}</span>
       </footer>
     </article>
   );

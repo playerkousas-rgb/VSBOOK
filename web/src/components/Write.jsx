@@ -3,6 +3,7 @@ import { Icon, Modal, cx } from '../ui.jsx';
 import { SignaturePad } from './Ink.jsx';
 import { shrinkInk } from '../signature.js';
 import { useLang } from '../i18n.jsx';
+import { useReadOnly } from '../bookContext.js';
 
 /**
  * Write — 紙本橫線／欄位填寫元件（對齊 ROVERBOOK v15）：
@@ -43,6 +44,7 @@ export default function Write({
   max = MAX,
 }) {
   const { isEn } = useLang();
+  const readOnly = useReadOnly();
   const [editing, setEditing] = useState(false);
   const [zoom, setZoom] = useState(false);
   const fieldRef = useRef(null);
@@ -76,6 +78,29 @@ export default function Write({
     ro.observe(parent);
     return () => ro.disconnect();
   }, [editing, max]);
+
+  if (readOnly) {
+    return (
+      <span
+        className={cx(
+          'write write--readonly',
+          multiline && 'write--multi',
+          compact && 'write--compact',
+          !value && 'is-empty',
+          className,
+        )}
+        style={multiline ? { '--rows': rows } : undefined}
+      >
+        {isInkValue(value) ? (
+          <img className="write__ink" src={value.ink} alt={label || '手寫'} />
+        ) : (
+          <span className="write__fit write__text" ref={fieldRef} style={align ? { textAlign: align } : undefined}>
+            {plainText(value)}
+          </span>
+        )}
+      </span>
+    );
+  }
 
   if (type === 'date') {
     return (

@@ -10,7 +10,7 @@ import {
   today,
   uid,
 } from '@shared/book.js';
-import { useBook, useField } from '../bookContext.js';
+import { useBook, useField, useReadOnly } from '../bookContext.js';
 import { BadgeArt, Bilingual, Grid, H, Line, P, Page, Rows } from '../components/Form.jsx';
 import Write from '../components/Write.jsx';
 import { download, slugify } from '../bookStore.js';
@@ -26,6 +26,7 @@ import { LegalNote } from '../components/Legal.jsx';
 
 export function P34() {
   const { update } = useBook();
+  const { isEn } = useLang();
   const [swaDate, setSwaDate] = useField('pages.p34.swaCompletedDate');
   const [faDate, setFaDate] = useField('pages.p34.faCompletedDate');
 
@@ -52,9 +53,7 @@ export function P34() {
         <Line label="「探索」課程證書編號" en="Certificate No. of SWA – Discovery" path="pages.p34.swaDiscoveryCert" />
         <Line label="完成「自願服務」日期" en="Date of Completion of SWA – Volunteer Service" type="date" path="pages.p34.swaServiceDate" />
         <div className="frow">
-          <span className="frow__label">
-            完成寰宇童軍章日期 <em>Date of Completion</em>
-          </span>
+          <span className="frow__label">{isEn ? 'Date of Completion' : '完成寰宇童軍章日期'}</span>
           <span className="frow__value">
             <Write
               type="date"
@@ -75,9 +74,7 @@ export function P34() {
       </div>
       <Grid cols={2}>
         <div className="frow">
-          <span className="frow__label">
-            完成日期 <em>Date of Completion</em>
-          </span>
+          <span className="frow__label">{isEn ? 'Date of Completion' : '完成日期'}</span>
           <span className="frow__value">
             <Write
               type="date"
@@ -100,6 +97,7 @@ export function P34() {
 
 export function P35() {
   const { update } = useBook();
+  const { isEn } = useLang();
   const [linkDate, setLinkDate] = useField('pages.p35.completedDate');
 
   return (
@@ -111,9 +109,7 @@ export function P35() {
       <div className="awardbox">
         <Grid cols={2}>
           <div className="frow">
-            <span className="frow__label">
-              完成日期 <em>Date of Completion</em>
-            </span>
+            <span className="frow__label">{isEn ? 'Date of Completion' : '完成日期'}</span>
             <span className="frow__value">
               <Write
                 type="date"
@@ -141,9 +137,12 @@ export function P35() {
 
 function QuickBadgeAdder({ listPath, filterFn }) {
   const { update } = useBook();
+  const readOnly = useReadOnly();
   const { isEn } = useLang();
   const [pick, setPick] = useState('');
   const options = OTHER_BADGES.filter(filterFn);
+
+  if (readOnly) return null;
 
   const addPicked = (id) => {
     const meta = OTHER_BADGES.find((o) => o.id === id);
@@ -152,7 +151,7 @@ function QuickBadgeAdder({ listPath, filterFn }) {
     update((b) => {
       const next = structuredClone(b);
       const arr = Array.isArray(next[listPath]) ? next[listPath].slice() : [];
-      arr.push({ id: uid('ob'), badge: `${meta.name}${meta.en ? ` ${meta.en}` : ''}`, certNo: '', date: d });
+      arr.push({ id: uid('ob'), badge: isEn && meta.en ? meta.en : meta.name, certNo: '', date: d });
       next[listPath] = arr;
       next.progress = next.progress || {};
       if (!next.progress[id]?.date) next.progress[id] = { date: d };
@@ -162,7 +161,7 @@ function QuickBadgeAdder({ listPath, filterFn }) {
   };
 
   return (
-    <div className="subselect">
+    <div className="subselect no-print">
       <label>
         <span>{isEn ? 'Quick-insert official badge (syncs with vsbadge)' : '快速帶入官方獎章名稱（同步 vsbadge 進度）'}</span>
         <select
@@ -193,7 +192,7 @@ export function P36() {
         path="wosmBadges"
         min={8}
         dense
-        addLabel="加一個獎章"
+        addLabel={null}
         cols={[
           { k: 'badge', label: '獎章', en: 'Badge', width: 2 },
           { k: 'certNo', label: '證書編號', en: 'Certificate Number', width: 1.3 },
@@ -213,7 +212,7 @@ export function P37() {
         path="otherBadges1"
         min={8}
         dense
-        addLabel="加一個獎章"
+        addLabel={null}
         cols={[
           { k: 'badge', label: '獎章', en: 'Badge', width: 2 },
           { k: 'certNo', label: '證書編號', en: 'Certificate Number', width: 1.3 },
@@ -232,7 +231,7 @@ export function P38() {
         path="otherBadges2"
         min={8}
         dense
-        addLabel="加一個獎章"
+        addLabel={null}
         cols={[
           { k: 'badge', label: '獎章', en: 'Badge', width: 2 },
           { k: 'certNo', label: '證書編號', en: 'Certificate Number', width: 1.3 },
@@ -254,7 +253,7 @@ export function P39() {
         path="additional"
         min={7}
         dense
-        addLabel="加一項經驗"
+        addLabel={null}
         cols={[
           { k: 'period', label: '時段', en: 'Period', width: 1.1, placeholder: '2026-01 至 2026-09' },
           { k: 'item', label: '項目', en: 'Items', width: 1.4, placeholder: '執委會職位／活動名稱' },
@@ -276,7 +275,7 @@ export function P40() {
         path="expeditions"
         min={7}
         dense
-        addLabel="加一次遠足或海外活動"
+        addLabel={null}
         cols={[
           { k: 'period', label: '時段', en: 'Period', width: 1.1, placeholder: '2026-08-21 至 08-23' },
           { k: 'item', label: '項目', en: 'Items', width: 1.4, placeholder: '遠足路線／海外活動' },

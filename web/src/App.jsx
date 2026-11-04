@@ -3,12 +3,14 @@ import { PAGE_TOTAL, SECTIONS, syncIdentity } from '@shared/book.js';
 import { BookCtx } from './bookContext.js';
 import { loadBook, persistBook } from './bookStore.js';
 import { LangProvider, useLang } from './i18n.jsx';
+import { isLeader, leaderAvailable, onLeaderChange } from './leader.js';
 import { UPDATE_EVENT, applyPwaUpdate } from './pwa.js';
 import { Link, navigate, useFullLocation, useRoute } from './router.jsx';
 import { Crest, Icon, ToastProvider, cx, useToast } from './ui.jsx';
 import { IndexSheet, Pager } from './components/Paper.jsx';
 import ShowQrDialog from './components/ShowQrDialog.jsx';
 import MenuDialog from './components/MenuDialog.jsx';
+import LeaderGate from './components/LeaderGate.jsx';
 import Welcome from './pages/Welcome.jsx';
 import CoverPage from './pages/CoverPage.jsx';
 import { ContentsPage, P01, P02, P03, P04, P05, P06, P07, P08 } from './pages/BookFront.jsx';
@@ -29,7 +31,7 @@ const PAGES = {
   appendix: AppendixPage,
 };
 
-function BookApp({ book, saveIssue }) {
+function BookApp({ book, saveIssue, leader, leaderReady }) {
   const path = useRoute();
   const { push } = useToast();
   const { isEn, toggle } = useLang();
@@ -57,6 +59,7 @@ function BookApp({ book, saveIssue }) {
   }, []);
 
   const printAll = path === '/print';
+  const leaderRoute = path === '/leader';
   const section = path.startsWith('/p/') ? path.slice(3) : null;
   const formId = path.startsWith('/forms') ? path.split('/').filter(Boolean)[1] || 'index' : null;
   const scanPath = ['/scan', '/scan/view', '/scan/signoff'].includes(path) ? path : null;
@@ -120,7 +123,16 @@ function BookApp({ book, saveIssue }) {
     <div
       className={cx(
         'app',
-        printAll ? 'app--print' : scanPath ? 'app--scan' : formId ? 'app--forms' : section ? 'app--book' : 'app--cover',
+        leader && 'app--leader',
+        printAll
+          ? 'app--print'
+          : scanPath || leaderRoute
+            ? 'app--scan'
+            : formId
+              ? 'app--forms'
+              : section
+                ? 'app--book'
+                : 'app--cover',
       )}
     >
       <header className={cx('chipbar no-print', section && 'chipbar--page')}>
@@ -170,7 +182,19 @@ function BookApp({ book, saveIssue }) {
         )}
 
         <div className="chipbar__actions">
-          {section && (
+          {leader && (
+            <button
+              type="button"
+              className="chipbtn chipbtn--leader"
+              onClick={() => navigate('/scan')}
+              title={isEn ? 'Leader Mode (Read-Only) — Scan member QR' : '領袖模式（只讀）— 掃描成員二維碼'}
+            >
+              <Icon name="lock" size={13} />{' '}
+              <span>{isEn ? 'Leader · Read-Only' : '領袖 · 只讀'}</span>
+            </button>
+          )}
+
+          {section && !leader && (
             <span className={cx('chipbar__save hide-sm', saveIssue && 'is-error')}>
               {saveIssue ? (isEn ? 'UNSAVED' : '未儲存') : savedAt ? (isEn ? 'SAVED' : '已儲存') : 'LOCAL'}
             </span>
@@ -187,9 +211,11 @@ function BookApp({ book, saveIssue }) {
             </button>
           )}
 
-          <button type="button" className="chipbtn chipbtn--gold" onClick={() => setQrOpen(true)}>
-            <Icon name="qr" size={15} /> <span className="hide-sm">{isEn ? 'Show QR' : '出示 QR'}</span>
-          </button>
+          {!leader && (
+            <button type="button" className="chipbtn chipbtn--gold" onClick={() => setQrOpen(true)}>
+              <Icon name="qr" size={15} /> <span className="hide-sm">{isEn ? 'Show QR' : '出示 QR'}</span>
+            </button>
+          )}
 
           <button
             type="button"
@@ -206,6 +232,17 @@ function BookApp({ book, saveIssue }) {
           </button>
         </div>
       </header>
+
+      {leader && section && (
+        <div className="readonlybar no-print" role="status">
+          <Icon name="lock" size={13} />
+          <span>
+            {isEn
+              ? 'Leader Mode (Read-Only): local book editing is locked. Tap “Scan” to inspect a member QR, or leave Leader Mode in Menu to edit your own book.'
+              : '領袖模式（只讀）：目前為唯讀狀態，不會修改本機資料。可按上方「領袖 · 只讀」掃描成員二維碼，或在選單退出領袖模式。'}
+          </span>
+        </div>
+      )}
 
       {!online && (
         <div className="offlinebar no-print" role="status">
@@ -252,14 +289,24 @@ function BookApp({ book, saveIssue }) {
             'stage__inner',
             section && 'stage__inner--page',
             formId && 'stage__inner--forms',
-            scanPath && 'stage__inner--scan',
+            (scanPath || leaderRoute) && 'stage__inner--scan',
           )}
           style={zoom > 1 ? { zoom } : undefined}
         >
           {printAll ? (
             <PrintBook pages={PAGES} />
+          ) : leaderRoute ? (
+            leader ? (
+              <Scan hasBook />
+            ) : (
+              <LeaderGate mode="page" />
+            )
           ) : scanPath ? (
-            scanPath === '/scan/view' ? (
+            scanPath === '/scan/signoff' && !leader ? (
+              <Signoff />
+            ) : !leader ? (
+              <LeaderGate mode="gate" />
+            ) : scanPath === '/scan/view' ? (
               <ScanView />
             ) : scanPath === '/scan/signoff' ? (
               <Signoff />
@@ -287,14 +334,17 @@ function BookApp({ book, saveIssue }) {
               }}
               last={lastMeta}
               onContinue={() => lastMeta && navigate(`/p/${lastMeta.id}`)}
+              onLeader={!leader && leaderReady ? () => navigate('/leader') : null}
             />
           )}
         </div>
       </main>
 
-      {section && !printAll && !scanPath && <Pager current={section} onOpenIndex={() => setIndexOpen(true)} />}
+      {section && !printAll && !scanPath && !leaderRoute && (
+        <Pager current={section} onOpenIndex={() => setIndexOpen(true)} />
+      )}
 
-      {!section && !printAll && !scanPath && !formId && (
+      {!section && !printAll && !scanPath && !leaderRoute && !formId && (
         <div className="coverhint no-print">
           <span>
             {isEn
@@ -322,6 +372,8 @@ function BookApp({ book, saveIssue }) {
           setMenuOpen(false);
           setQrOpen(true);
         }}
+        leader={leader}
+        leaderReady={leaderReady}
       />
     </div>
   );
@@ -332,11 +384,23 @@ function AppInner() {
   const path = useRoute();
   const [book, setBook] = useState(() => loadBook());
   const [saveIssue, setSaveIssue] = useState(null);
+  const [leader, setLeader] = useState(isLeader);
+  const [leaderReady, setLeaderReady] = useState(null);
+
+  useEffect(() => onLeaderChange(() => setLeader(isLeader())), []);
+  useEffect(() => {
+    let live = true;
+    leaderAvailable().then((v) => live && setLeaderReady(v));
+    return () => {
+      live = false;
+    };
+  }, []);
 
   const hashMatch = /#v=([^&]+)/.exec(fullLoc);
   const hashToken = hashMatch ? decodeURIComponent(hashMatch[1]) : '';
 
   const update = useCallback((updater) => {
+    if (isLeader()) return;
     setBook((prev) => {
       if (!prev) return prev;
       const next = typeof updater === 'function' ? updater(structuredClone(prev)) : { ...prev, ...updater };
@@ -357,24 +421,31 @@ function AppInner() {
     return () => clearTimeout(t);
   }, [book]);
 
-  const ctx = useMemo(() => ({ book, update, replace }), [book, update, replace]);
+  const ctx = useMemo(() => ({ book, update, replace, readOnly: leader }), [book, update, replace, leader]);
 
+  // 分享連結 #v=... 同樣必須先開啟領袖模式（只讀），普通模式不能讀取他人紀錄冊
   if (hashToken) {
     return (
       <ToastProvider>
         <div className="app app--scan">
-          <HashSnapshotViewer token={hashToken} />
+          {leader ? <HashSnapshotViewer token={hashToken} /> : <LeaderGate mode="gate" />}
         </div>
       </ToastProvider>
     );
   }
 
-  // 領袖毋須先建立個人紀錄冊亦可使用 /scan 及 /scan/view
-  if (!book && (path === '/scan' || path === '/scan/view')) {
+  // 未建立個人紀錄冊時進入 /leader、/scan、/scan/view：必須通過 LeaderGate
+  if (!book && (path === '/leader' || path === '/scan' || path === '/scan/view')) {
     return (
       <ToastProvider>
         <div className="app app--scan">
-          {path === '/scan/view' ? <ScanView /> : <Scan hasBook={false} />}
+          {!leader ? (
+            <LeaderGate mode={path === '/leader' ? 'page' : 'gate'} />
+          ) : path === '/scan/view' ? (
+            <ScanView />
+          ) : (
+            <Scan hasBook={false} />
+          )}
         </div>
       </ToastProvider>
     );
@@ -383,7 +454,10 @@ function AppInner() {
   if (!book) {
     return (
       <ToastProvider>
-        <Welcome onReady={(next) => replace(next)} onLeaderScan={() => navigate('/scan')} />
+        <Welcome
+          onReady={(next) => replace(next)}
+          onLeader={leaderReady ? () => navigate('/leader') : null}
+        />
       </ToastProvider>
     );
   }
@@ -391,7 +465,7 @@ function AppInner() {
   return (
     <BookCtx.Provider value={ctx}>
       <ToastProvider>
-        <BookApp book={book} saveIssue={saveIssue} />
+        <BookApp book={book} saveIssue={saveIssue} leader={leader} leaderReady={leaderReady} />
       </ToastProvider>
     </BookCtx.Provider>
   );

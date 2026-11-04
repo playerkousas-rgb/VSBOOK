@@ -13,6 +13,7 @@ import SignoffPanel from '../components/SignoffPanel.jsx';
 import { Crest, Icon, useToast } from '../ui.jsx';
 import { Link, navigate } from '../router.jsx';
 import { useLang } from '../i18n.jsx';
+import { exitLeaderMode } from '../leader.js';
 import { LegalNote } from '../components/Legal.jsx';
 
 const SCAN_MEMBER_KEY = 'vsbook.scan.member.v1';
@@ -148,15 +149,25 @@ export function Scan({ hasBook = true }) {
         <Link to="/" className="scanhead__back" aria-label="返回">
           <Icon name="back" size={18} />
         </Link>
-        <div>
-          <span className="eyebrow">OFFLINE QR SCANNER · 零伺服器掃碼</span>
-          <h1>{isEn ? 'Scan Member QR or Leader Return QR' : '掃描成員紀錄冊或領袖核簽回傳碼'}</h1>
+        <div style={{ flex: 1 }}>
+          <span className="eyebrow">LEADER MODE · READ-ONLY · 領袖只讀模式</span>
+          <h1>{isEn ? 'Scan Member Record Book (Read-Only)' : '掃描成員紀錄冊（只讀檢視及核簽）'}</h1>
           <p>
             {isEn
-              ? 'Leaders: scan a member QR to inspect & sign off. Members: scan the leader Return QR to write signatures into your book.'
-              : '領袖掃描成員二維碼即可查閱及一次簽名核簽；成員掃描領袖手機上的「回傳碼」即可將簽名寫入紀錄冊。'}
+              ? 'Leader Mode is strictly read-only: inspect shared sections without modifying the member’s device, or issue a signed Return QR.'
+              : '領袖模式為只讀（Read-Only）：對準成員出示的二維碼即可唯讀查閱已分享內容，核對後可簽發核簽回傳碼。'}
           </p>
         </div>
+        <button
+          type="button"
+          className="btn btn--ghost btn--sm"
+          onClick={() => {
+            exitLeaderMode();
+            navigate('/');
+          }}
+        >
+          <Icon name="lock" size={13} /> {isEn ? 'Leave Leader Mode' : '退出領袖模式'}
+        </button>
       </header>
 
       <div className={`scanner scanner--${status}`}>
@@ -252,7 +263,7 @@ export function MemberPayloadView({ payload, withSignoff = false, onCloseHref = 
         </Link>
         <span className="scanview__title">
           {m.nameZh || m.nameEn || (isEn ? 'Venture Scout Member' : '深資童軍成員')} ·{' '}
-          {isEn ? `${received.length} sections shared` : `今次分享了 ${received.length} 組資料`}
+          {isEn ? `${received.length} sections (Read-Only)` : `只讀檢視 · 今次分享了 ${received.length} 組資料`}
         </span>
       </div>
 

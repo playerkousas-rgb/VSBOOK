@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { SECTIONS, allStats, sanitizeHkidPrefix, today, uid } from '@shared/book.js';
-import { useBook, useField } from '../bookContext.js';
+import { useBook, useField, useReadOnly } from '../bookContext.js';
 import { Area, BadgeArt, Bilingual, Grid, H, Line, Note, P, Page, Rows, Sig } from '../components/Form.jsx';
 import { PhotoPicker } from '../components/PhotoPicker.jsx';
 import Write from '../components/Write.jsx';
@@ -224,10 +224,10 @@ export function P02() {
       <Rows
         path="transfers"
         min={3}
-        addLabel="加一次轉旅"
+        addLabel={null}
         cols={[
           { k: 'date', label: '日期', en: 'Date', type: 'date', width: 1 },
-          { k: 'newGroup', label: '新旅旅號', en: 'Number of New Group', width: 2, placeholder: '例如：港島第 28 旅' },
+          { k: 'newGroup', label: '新旅旅號', en: 'Number of New Group', width: 2 },
         ]}
       />
 
@@ -273,8 +273,8 @@ export function P03() {
       <div className="pgtable pgtable--dense">
         <div className="pgtable__head pgtable__row pgtable__row--6">
           <span>{isEn ? 'Section' : '支部'}</span>
-          <span>{isEn ? 'From' : '由 From'}</span>
-          <span>{isEn ? 'To' : '至 To'}</span>
+          <span>{isEn ? 'From' : '由'}</span>
+          <span>{isEn ? 'To' : '至'}</span>
           <span style={{ flex: 1.6 }}>{isEn ? 'Group / Unit' : '旅／單位'}</span>
           <span>{isEn ? 'Post / Rank' : '崗位／職位'}</span>
           <span style={{ flex: 1.4 }}>{isEn ? 'Highest Award' : '獲取之最高獎章'}</span>
@@ -285,7 +285,6 @@ export function P03() {
             <div key={s.key} className="pgtable__row pgtable__row--6">
               <span className="pgtable__cell pgtable__sec" data-label={isEn ? 'Section' : '支部'}>
                 <strong>{isEn ? s.en : s.zh}</strong>
-                {!isEn && <small>{s.en}</small>}
               </span>
               <span className="pgtable__cell" data-label={isEn ? 'From' : '由'}>
                 <Write value={row.from || ''} onChange={(v) => setExp(s.key, 'from', v)} compact placeholder="YYYY-MM" label={`${s.zh} 由`} />
@@ -312,7 +311,7 @@ export function P03() {
         path="addressChanges"
         min={2}
         dense
-        addLabel="加一次搬遷"
+        addLabel={null}
         cols={[
           { k: 'date', label: '日期', en: 'Date', type: 'date', width: 1 },
           { k: 'address', label: '新地址', en: 'New Address', width: 2.6 },
@@ -324,7 +323,7 @@ export function P03() {
         path="detailChanges"
         min={2}
         dense
-        addLabel="加一次更改"
+        addLabel={null}
         cols={[
           { k: 'date', label: '日期', en: 'Date', type: 'date', width: 1 },
           { k: 'item', label: '項目', en: 'Item', width: 1.2 },
@@ -338,11 +337,13 @@ export function P03() {
 /* ------------------------------------------------------------ 第 4–5 頁：會員資格續期 */
 function RenewalRows({ startIndex, count }) {
   const { book, update } = useBook();
+  const readOnly = useReadOnly();
   const { isEn } = useLang();
   const [signIdx, setSignIdx] = useState(null);
   const list = Array.isArray(book.renewals) ? book.renewals : [];
 
   const setRow = (idx, patch) => {
+    if (readOnly) return;
     update((b) => {
       const next = Array.isArray(b.renewals) ? b.renewals.slice() : [];
       while (next.length <= idx) next.push({ id: uid('ren'), date: '', validUntil: '', note: '' });
@@ -355,9 +356,9 @@ function RenewalRows({ startIndex, count }) {
     <>
       <div className="renewtable">
         <div className="renewtable__head">
-          <span>{isEn ? 'Date' : '日期 Date'}</span>
-          <span>{isEn ? 'Valid Until' : '有效日期至 Valid Until'}</span>
-          <span style={{ flex: 1.8 }}>{isEn ? 'Group Chop and Signature' : '旅印及簽署 Group Chop and Signature'}</span>
+          <span>{isEn ? 'Date' : '日期'}</span>
+          <span>{isEn ? 'Valid Until' : '有效日期至'}</span>
+          <span style={{ flex: 1.8 }}>{isEn ? 'Group Chop and Signature' : '旅印及簽署'}</span>
         </div>
 
         {Array.from({ length: count }).map((_, offset) => {
@@ -382,9 +383,9 @@ function RenewalRows({ startIndex, count }) {
               <div className="renewrow__cell renewrow__chop" style={{ flex: 1.8 }} data-label={isEn ? 'Chop & Signature' : '旅印及簽署'}>
                 <div className="renewrow__sigarea">
                   {r.signature?.png ? (
-                    <img src={r.signature.png} alt="團長簽署" onClick={() => setSignIdx(idx)} />
+                    <img src={r.signature.png} alt="團長簽署" onClick={() => !readOnly && setSignIdx(idx)} />
                   ) : (
-                    <SealMark text={book.member?.group || '旅印'} sub="CHOP" size={54} />
+                    <SealMark text={book.member?.group || (isEn ? 'CHOP' : '旅印')} sub={isEn ? '' : ''} size={48} />
                   )}
                   <Write
                     value={r.note || ''}
@@ -393,9 +394,11 @@ function RenewalRows({ startIndex, count }) {
                     placeholder={isEn ? 'VSL name / chop note' : '團長姓名／旅印備註'}
                     label="旅印及簽署備註"
                   />
-                  <button type="button" className="linkbtn" onClick={() => setSignIdx(idx)}>
-                    <Icon name="pen" size={12} /> {r.signature?.png ? (isEn ? 'Re-sign' : '重簽') : isEn ? 'Sign' : '簽署'}
-                  </button>
+                  {!readOnly && (
+                    <button type="button" className="linkbtn no-print" onClick={() => setSignIdx(idx)}>
+                      <Icon name="pen" size={12} /> {r.signature?.png ? (isEn ? 'Re-sign' : '重簽') : isEn ? 'Sign' : '簽署'}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -450,6 +453,7 @@ export function P05() {
 
 /* ------------------------------------------------------------ 第 6 頁：目的 · 方法 · 教育目標 · 銘言 */
 export function P06() {
+  const { isEn } = useLang();
   return (
     <Page id="p06">
       <H en="VENTURE SCOUT SECTION">深資童軍支部</H>
@@ -467,69 +471,78 @@ export function P06() {
       <div className="mottogrid">
         <div className="mottocard">
           <Bilingual as="h4" zh="教育目標" en="EDUCATIONAL OBJECTIVE" />
-          <strong>自務自治，明日領袖</strong>
-          <em>Self-Governance, Future Leadership</em>
+          <strong>{isEn ? 'Self-Governance, Future Leadership' : '自務自治，明日領袖'}</strong>
         </div>
         <div className="mottocard">
           <Bilingual as="h4" zh="童軍銘言" en="SCOUT MOTTO" />
-          <strong>準備</strong>
-          <em>Be Prepared</em>
+          <strong>{isEn ? 'Be Prepared' : '準備'}</strong>
         </div>
       </div>
     </Page>
   );
 }
 
-/* ------------------------------------------------------------ 第 7 頁：童軍誓詞 · 童軍規律 */
-const LAWS = [
-  ['1. 童軍信用為人敬。', '1. A Scout is to be trusted.'],
-  ['2. 童軍待人要忠誠。', '2. A Scout is loyal.'],
-  ['3. 童軍友善兼親切。', '3. A Scout is friendly and considerate.'],
-  ['4. 童軍相處如手足。', '4. A Scout belongs to the world-wide family of Scouts.'],
-  ['5. 童軍勇敢不怕難。', '5. A Scout has courage in all difficulties.'],
-  ['6. 童軍愛物更惜陰。', '6. A Scout makes good use of time and is careful of possessions and property.'],
-  ['7. 童軍自重又重人。', '7. A Scout has self respect and respect for others.'],
+/* ------------------------------------------------------------ 第 7 頁：童軍誓詞 · 童軍規律（單語分版，對齊 ROVERBOOK v16） */
+const PROMISE_ZH = [
+  '我願以信譽為誓，竭盡所能；',
+  '對神明，對國家，盡責任；',
+  '對別人，要幫助；',
+  '對規律，必遵行。',
+];
+
+const PROMISE_EN =
+  'On my honour, I promise that I will do my best to do my duty to God and to my Country, to help other people and to keep the Scout Law.';
+
+const LAWS_ZH = [
+  '童軍信用為人敬。',
+  '童軍待人要忠誠。',
+  '童軍友善兼親切。',
+  '童軍相處如手足。',
+  '童軍勇敢不怕難。',
+  '童軍愛物更惜陰。',
+  '童軍自重又重人。',
+];
+
+const LAWS_EN = [
+  'A Scout is to be trusted.',
+  'A Scout is loyal.',
+  'A Scout is friendly and considerate.',
+  'A Scout belongs to the world-wide family of Scouts.',
+  'A Scout has courage in all difficulties.',
+  'A Scout makes good use of time and is careful of possessions and property.',
+  'A Scout has self respect and respect for others.',
 ];
 
 export function P07() {
   const { isEn } = useLang();
   return (
-    <Page id="p07">
-      <H en="VENTURE SCOUT SECTION">深資童軍支部</H>
+    <Page id="p07" className="p-promise">
+      <H en="SCOUT PROMISE AND LAW">童軍誓詞與規律</H>
 
-      <Bilingual as="h3" className="secsub" zh="童軍誓詞" en="SCOUT PROMISE" />
-      <blockquote className="promisebox">
-        {!isEn && (
-          <p className="promisebox__zh">
-            我願以信譽為誓，竭盡所能；
-            <br />
-            對神明，對國家，盡責任；
-            <br />
-            對別人，要幫助；
-            <br />
-            對規律，必遵行。
+      <section className="promise-block">
+        <h3 className="promise-block__title">{isEn ? 'Scout Promise' : '童軍誓詞'}</h3>
+        {isEn ? (
+          <p className="promise-block__text promise-block__text--en">{PROMISE_EN}</p>
+        ) : (
+          <p className="promise-block__text">
+            {PROMISE_ZH.map((line) => (
+              <span key={line}>{line}</span>
+            ))}
           </p>
         )}
-        <p className="promisebox__en">
-          On my honour, I promise that I will do my best
-          <br />
-          to do my duty to God and to my Country
-          <br />
-          to help other people
-          <br />
-          and to keep the Scout Law.
-        </p>
-      </blockquote>
+      </section>
 
-      <Bilingual as="h3" className="secsub" zh="童軍規律" en="SCOUT LAW" />
-      <ol className="lawlist">
-        {LAWS.map(([zh, en]) => (
-          <li key={zh}>
-            {!isEn && <strong>{zh}</strong>}
-            <span>{en}</span>
-          </li>
-        ))}
-      </ol>
+      <section className="promise-block">
+        <h3 className="promise-block__title">{isEn ? 'Scout Law' : '童軍規律'}</h3>
+        <ol className="promise-law">
+          {(isEn ? LAWS_EN : LAWS_ZH).map((line, i) => (
+            <li key={line}>
+              <span className="promise-law__no">{i + 1}</span>
+              <span className="promise-law__text">{line}</span>
+            </li>
+          ))}
+        </ol>
+      </section>
     </Page>
   );
 }

@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Icon, Modal, useToast } from '../ui.jsx';
 import { useBook } from '../bookContext.js';
 import { qrSvg } from '../qr.js';
-import { QR_LIMIT, TRANSFER_OPTIONS, encodeTransfer } from '@shared/transfer.js';
+import { QR_LIMIT, TRANSFER_OPTIONS, KIND_SIGNOFF, decodePayload, encodeTransfer } from '@shared/transfer.js';
+import { navigate } from '../router.jsx';
 import { useLang } from '../i18n.jsx';
 
 export default function ShowQrDialog({ open, onClose }) {
@@ -14,6 +15,8 @@ export default function ShowQrDialog({ open, onClose }) {
   const [svg, setSvg] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [showSignoffBox, setShowSignoffBox] = useState(false);
+  const [signoffCode, setSignoffCode] = useState('');
 
   useEffect(() => {
     if (open) {
@@ -67,8 +70,8 @@ export default function ShowQrDialog({ open, onClose }) {
       title={isEn ? 'Choose Sections to Present' : '揀選今次要給領袖查閱的內容'}
       subtitle={
         isEn
-          ? 'Unselected by default for privacy. Leader scans via /scan to inspect and sign off.'
-          : '為保護私隱，每次打開預設全不選；剔選「個人及旅團資料＋訓練綱要進度」即可讓領袖掃描核簽。'
+          ? 'Members can only show their own QR code. Ask your leader to enter Leader Mode (Read-Only) in VSBOOK to scan.'
+          : '普通模式只可出示自己的二維碼（不能讀取他人紀錄冊）。請領袖在 VSBOOK 開啟「領袖模式（只讀）」後掃描查閱或核簽。'
       }
       wide
     >
@@ -142,6 +145,56 @@ export default function ShowQrDialog({ open, onClose }) {
             <span className="tiny">
               {result.chars} / {QR_LIMIT} chars · {result.compressed ? (isEn ? 'gzip compressed' : 'gzip 已壓縮') : 'raw'}
             </span>
+          </div>
+        )}
+      </div>
+
+      <div className="qrsignoff-in">
+        <button
+          type="button"
+          className="linkbtn"
+          onClick={() => {
+            setShowSignoffBox((v) => !v);
+            setError('');
+          }}
+        >
+          {isEn ? 'Have a Leader Sign-off Slip (VS1S.)? Paste here' : '收到領袖簽發的「核簽回傳碼（VS1S.）」？點此貼上寫入'}
+        </button>
+        {showSignoffBox && (
+          <div className="qrsignoff-in__row">
+            <input
+              type="text"
+              value={signoffCode}
+              onChange={(e) => {
+                setSignoffCode(e.target.value);
+                setError('');
+              }}
+              placeholder="VS1S...."
+            />
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              onClick={async () => {
+                try {
+                  const payload = await decodePayload(signoffCode);
+                  if (payload.t !== KIND_SIGNOFF) {
+                    setError(
+                      isEn
+                        ? 'Normal mode cannot read member record books. Enter Leader Mode (Read-Only) first.'
+                        : '普通模式不能讀取他人紀錄冊；此欄只接收領袖簽發的 VS1S. 核簽回傳碼。',
+                    );
+                    return;
+                  }
+                  window.sessionStorage.setItem('vsbook.scan.signoff.v1', JSON.stringify(payload));
+                  onClose();
+                  navigate('/scan/signoff');
+                } catch (e) {
+                  setError(e.message || (isEn ? 'Invalid sign-off code' : '核簽回傳碼格式不正確'));
+                }
+              }}
+            >
+              {isEn ? 'Apply' : '讀取核簽單'}
+            </button>
           </div>
         )}
       </div>

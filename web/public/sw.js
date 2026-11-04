@@ -1,10 +1,14 @@
 /* VSBOOK Service Worker — 確保露營、遠足及離線集會現場仍可完整開啟與讀寫紀錄冊。 */
 
-const CACHE_NAME = 'vsbook-cache-r2';
+const CACHE_NAME = 'vsbook-cache-r3';
 const SHELL = [
   '/',
   '/index.html',
   '/manifest.webmanifest',
+  '/favicon.svg',
+  '/favicon.ico',
+  '/favicon-32.png',
+  '/favicon-48.png',
   '/icons/favicon.ico',
   '/icons/favicon-16.png',
   '/icons/favicon-32.png',
@@ -97,6 +101,7 @@ self.addEventListener('fetch', (event) => {
     url.pathname.startsWith('/assets/') ||
     url.pathname.startsWith('/icons/') ||
     url.pathname.startsWith('/img/') ||
+    url.pathname.startsWith('/favicon') ||
     url.pathname === '/manifest.webmanifest'
   ) {
     event.respondWith(cacheFirstStatic(req));

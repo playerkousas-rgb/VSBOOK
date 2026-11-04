@@ -8,6 +8,11 @@ export function useBook() {
   return ctx;
 }
 
+export function useReadOnly() {
+  const ctx = useContext(BookCtx);
+  return Boolean(ctx?.readOnly);
+}
+
 export function getPath(obj, path) {
   if (!path) return undefined;
   return path.split('.').reduce((acc, key) => (acc == null ? undefined : acc[key]), obj);
@@ -34,11 +39,14 @@ export function setPath(obj, path, value) {
 }
 
 export function useField(path, fallback = '') {
-  const { book, update } = useBook();
+  const { book, update, readOnly } = useBook();
   const value = getPath(book, path);
   const set = useCallback(
-    (next) => update((b) => setPath(b, path, typeof next === 'function' ? next(getPath(b, path)) : next)),
-    [update, path],
+    (next) => {
+      if (readOnly) return;
+      update((b) => setPath(b, path, typeof next === 'function' ? next(getPath(b, path)) : next));
+    },
+    [update, path, readOnly],
   );
   return [value === undefined || value === null ? fallback : value, set];
 }

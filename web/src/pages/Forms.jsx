@@ -38,10 +38,11 @@ function useFormEditor(formId) {
 }
 
 function FCell({ label, en, k, values, set, type = 'text', span = 1, placeholder = '' }) {
+  const { isEn } = useLang();
   return (
     <div className={`ptcell ptcell--s${span}`}>
       <span className="ptcell__lbl">
-        {label} {en && <em>{en}</em>}
+        {isEn && en ? en : label} {!isEn && en && <em>{en}</em>}
       </span>
       <div className="ptcell__val">
         <Write value={values[k] || ''} onChange={(v) => set(k, v)} type={type} compact placeholder={placeholder} label={label} />
@@ -99,7 +100,6 @@ export function FormsIndex() {
                 </span>
               </div>
               <h2>{isEn ? meta.en : meta.title}</h2>
-              {!isEn && <p className="formcard__en">{meta.en}</p>}
               <p className="formcard__when">{meta.when}</p>
               <p className="tiny">{meta.duplexNote}</p>
 

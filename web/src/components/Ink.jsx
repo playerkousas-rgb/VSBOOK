@@ -3,6 +3,7 @@ import { Icon, Modal } from '../ui.jsx';
 import { shrinkSignature } from '../signature.js';
 import { today } from '@shared/book.js';
 import { useLang } from '../i18n.jsx';
+import { useReadOnly } from '../bookContext.js';
 
 const INK_COLOR = '#24161c';
 
@@ -218,6 +219,7 @@ export function SignModal({
 
 export function SignatureBlock({ label, en, value, onChange, defaultName = '', defaultTitle = '' }) {
   const { isEn } = useLang();
+  const readOnly = useReadOnly();
   const [open, setOpen] = useState(false);
 
   return (
@@ -227,26 +229,37 @@ export function SignatureBlock({ label, en, value, onChange, defaultName = '', d
           {isEn && en ? en : label}
           {!isEn && en && <em>{en}</em>}
         </span>
-        <div className="sigblock__actions">
-          {value?.png && (
-            <button type="button" className="linkbtn" onClick={() => onChange?.(null)}>
-              {isEn ? 'Clear' : '清除'}
+        {!readOnly && (
+          <div className="sigblock__actions">
+            {value?.png && (
+              <button type="button" className="linkbtn" onClick={() => onChange?.(null)}>
+                {isEn ? 'Clear' : '清除'}
+              </button>
+            )}
+            <button type="button" className="linkbtn" onClick={() => setOpen(true)}>
+              <Icon name="pen" size={12} /> {value?.png ? (isEn ? 'Re-sign' : '重簽') : isEn ? 'Sign' : '手寫簽名'}
             </button>
-          )}
-          <button type="button" className="linkbtn" onClick={() => setOpen(true)}>
-            <Icon name="pen" size={12} /> {value?.png ? (isEn ? 'Re-sign' : '重簽') : isEn ? 'Sign' : '手寫簽名'}
-          </button>
-        </div>
+          </div>
+        )}
       </div>
 
       {value?.png ? (
-        <div className="sigblock__preview" onClick={() => setOpen(true)} role="button" tabIndex={0}>
+        <div
+          className="sigblock__preview"
+          onClick={() => !readOnly && setOpen(true)}
+          role={readOnly ? undefined : 'button'}
+          tabIndex={readOnly ? undefined : 0}
+        >
           <img src={value.png} alt={label || '簽名'} />
           {(value.name || value.at) && (
             <small>
               {[value.name, value.title, value.at].filter(Boolean).join(' · ')}
             </small>
           )}
+        </div>
+      ) : readOnly ? (
+        <div className="sigblock__empty sigblock__empty--readonly">
+          <span>{isEn ? 'Unsigned' : '尚未簽署'}</span>
         </div>
       ) : (
         <button type="button" className="sigblock__empty" onClick={() => setOpen(true)}>

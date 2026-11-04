@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useBook, useField, getPath } from '../bookContext.js';
+import { useBook, useField, useReadOnly, getPath } from '../bookContext.js';
 import { Spread } from './Paper.jsx';
 import Write from './Write.jsx';
 import { SignatureBlock, SignModal } from './Ink.jsx';
@@ -163,6 +163,7 @@ export function Sig({ label, en, path, defaultName = '', defaultTitle = '' }) {
 /** 紙本「所選項目（請圈出）」互動紅圈選擇器 */
 export function CircleChoice({ label = '所選項目（請圈出）', en = 'Selected Item (Please Circle)', path, options, onSelect }) {
   const [value, set] = useField(path, '');
+  const readOnly = useReadOnly();
   const { isEn } = useLang();
   return (
     <div className="circlebox">
@@ -179,8 +180,10 @@ export function CircleChoice({ label = '所選項目（請圈出）', en = 'Sele
               key={opt.value}
               role="radio"
               aria-checked={active}
+              disabled={readOnly}
               className={cx('circleopt', active && 'is-circled')}
               onClick={() => {
+                if (readOnly) return;
                 const next = active ? '' : opt.value;
                 set(next);
                 onSelect?.(next);
@@ -198,11 +201,12 @@ export function CircleChoice({ label = '所選項目（請圈出）', en = 'Sele
 
 /** 會員章及肩章細項簽核表（對齊紙本三欄：項目｜主考｜日期，無自創勾選框） */
 export function AssessTable({ title, en, items, exempted = false }) {
-  const { book, update } = useBook();
+  const { book, update, readOnly } = useBook();
   const { isEn } = useLang();
   const [signItem, setSignItem] = useState(null);
 
   const setEntry = (id, patch) => {
+    if (readOnly) return;
     update((b) => ({
       ...b,
       progress: {
@@ -243,7 +247,13 @@ export function AssessTable({ title, en, items, exempted = false }) {
 
             <div className="assrow__init" data-label={isEn ? 'Initials' : '主考'}>
               {st.signature?.png ? (
-                <button type="button" className="assrow__sigbtn" onClick={() => setSignItem(it)} title={st.assessor || '主考簽名'}>
+                <button
+                  type="button"
+                  className="assrow__sigbtn"
+                  disabled={readOnly}
+                  onClick={() => !readOnly && setSignItem(it)}
+                  title={st.assessor || '主考簽名'}
+                >
                   <img src={st.signature.png} alt="簽名" />
                   {st.assessor && <small>{st.assessor}</small>}
                 </button>
@@ -256,15 +266,17 @@ export function AssessTable({ title, en, items, exempted = false }) {
                     placeholder={isEn ? 'Initials' : '主考'}
                     label={`${it.no || ''} 主考`}
                   />
-                  <button
-                    type="button"
-                    className="assrow__pen no-print"
-                    onClick={() => setSignItem(it)}
-                    title={isEn ? 'Handwrite initials' : '手寫簽名'}
-                    aria-label={isEn ? 'Sign initials' : '主考手寫簽名'}
-                  >
-                    <Icon name="pen" size={11} />
-                  </button>
+                  {!readOnly && (
+                    <button
+                      type="button"
+                      className="assrow__pen no-print"
+                      onClick={() => setSignItem(it)}
+                      title={isEn ? 'Handwrite initials' : '手寫簽名'}
+                      aria-label={isEn ? 'Sign initials' : '主考手寫簽名'}
+                    >
+                      <Icon name="pen" size={11} />
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -306,6 +318,7 @@ export function AssessTable({ title, en, items, exempted = false }) {
 /** 紙本表格（預設不顯示自創刪除鍵，手機自動展開為欄名在上、值在下） */
 export function Rows({ path, cols, min = 4, addLabel = null, del = false, dense = false, cap }) {
   const [stored, set] = useField(path, []);
+  const readOnly = useReadOnly();
   const { isEn } = useLang();
   const list = Array.isArray(stored) ? stored : [];
   const total = Math.max(min, list.length);
@@ -365,7 +378,7 @@ export function Rows({ path, cols, min = 4, addLabel = null, del = false, dense 
         </div>
       ))}
 
-      {addLabel !== null && (!cap || list.length < cap) && (
+      {!readOnly && addLabel !== null && (!cap || list.length < cap) && (
         <button type="button" className="addrow no-print" onClick={add}>
           + {addLabelFor(isEn ? 'en' : 'zh', addLabel || '加一行')}
         </button>
