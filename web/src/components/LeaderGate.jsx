@@ -34,7 +34,7 @@ export default function LeaderGate({ mode = 'page', onDone }) {
     if (result.ok) {
       setError('');
       if (onDone) onDone();
-      else if (mode === 'page') navigate('/scan/batch');
+      else if (mode === 'page') navigate('/scan');
       return;
     }
     setError(

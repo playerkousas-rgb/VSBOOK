@@ -4,15 +4,13 @@ import {
   OTHER_BADGES,
   PRINT_PAGES,
   demoBook,
-  exportForVsBadge,
-  exportProgressOnlyForVsBadge,
-  importFromVsBadge,
   newBook,
   today,
   uid,
 } from '@shared/book.js';
 import { useBook, useField, useReadOnly } from '../bookContext.js';
 import { BadgeArt, Bilingual, Grid, H, Line, P, Page, Rows } from '../components/Form.jsx';
+import VsBadgeSyncCard from '../components/VsBadgeSyncCard.jsx';
 import Write from '../components/Write.jsx';
 import { download, slugify } from '../bookStore.js';
 import { compressBookMedia, imageSizeLabel, storageUsage } from '../storageHealth.js';
@@ -293,10 +291,10 @@ export function P40() {
 
 export function AppendixPage() {
   const { book, replace } = useBook();
+  const readOnly = useReadOnly();
   const { push } = useToast();
   const { isEn } = useLang();
   const backupInput = useRef(null);
-  const vsbadgeInput = useRef(null);
   const [shrinking, setShrinking] = useState(false);
 
   const usage = storageUsage(book);
@@ -311,7 +309,7 @@ export function AppendixPage() {
       try {
         const parsed = JSON.parse(String(r.result || '{}'));
         if (!parsed || typeof parsed !== 'object' || !parsed.member) {
-          throw new Error('這不是完整的 VSBOOK 備份檔（如為 vsbadge 進度檔請用下方按鈕）');
+          throw new Error('這不是完整的 VSBOOK 備份檔（如為 vsbadge 進度檔請用上方按鈕）');
         }
         replace(newBook(parsed));
         push(isEn ? 'Full record book restored' : '已成功還原完整紀錄冊備份');
@@ -322,64 +320,11 @@ export function AppendixPage() {
     r.readAsText(file);
   };
 
-  const onImportVsBadge = (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    const r = new FileReader();
-    r.onload = () => {
-      try {
-        const parsed = JSON.parse(String(r.result || '{}'));
-        const res = importFromVsBadge(parsed, book);
-        replace(res.book);
-        push(
-          isEn
-            ? `Imported ${res.imported} items (${res.matchedBy})`
-            : `已匯入 ${res.imported} 項進度（對齊方式：${res.matchedBy}）`,
-        );
-      } catch (err) {
-        push(err.message || '匯入 vsbadge 失敗', 'error');
-      }
-    };
-    r.readAsText(file);
-  };
-
   return (
     <Page id="appendix">
       <H en="DIGITAL APPENDIX · SYNC & BACKUP">數位附錄 · 進度互通與備份</H>
 
-      <section className="appxcard">
-        <h3>
-          <Icon name="verified" size={16} /> {isEn ? 'Bidirectional Sync with vsbadge' : '與 vsbadge 進度雙向互通（2026 第十一版）'}
-        </h3>
-        <p className="tiny">
-          {isEn
-            ? 'Uses identical Scout ID and L1–L4 / OT-* item codes. Progress-only export contains zero personal particulars.'
-            : '共用同一童軍成員編號與四階／其他獎章編號；純進度匯出不含任何個人資料，匯入時亦不會覆蓋本機已有的領袖簽名。'}
-        </p>
-        <div className="appxbtns">
-          <button
-            type="button"
-            className="btn btn--primary btn--sm"
-            onClick={() => {
-              const payload = exportProgressOnlyForVsBadge(book);
-              download(`vsbook-progress-only-${slugify(book.member?.scoutId || 'member')}.json`, payload);
-              push(
-                isEn
-                  ? 'Exported progress-only JSON for vsbadge (no personal data)'
-                  : '已匯出純進度 JSON（不含個人資料，可直接餵給 vsbadge）',
-              );
-            }}
-          >
-            <Icon name="download" size={14} />{' '}
-            {isEn ? 'Export Progress Only for vsbadge' : '匯出純進度給 vsbadge（免個人資料）'}
-          </button>
-          <input ref={vsbadgeInput} type="file" accept="application/json,.json" hidden onChange={onImportVsBadge} />
-          <button type="button" className="btn btn--ghost btn--sm" onClick={() => vsbadgeInput.current?.click()}>
-            <Icon name="upload" size={14} /> {isEn ? 'Import from vsbadge' : '從 vsbadge 匯入進度'}
-          </button>
-        </div>
-      </section>
+      <VsBadgeSyncCard readOnly={readOnly} />
 
       <section className="appxcard">
         <h3>

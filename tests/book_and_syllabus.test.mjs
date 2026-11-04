@@ -89,26 +89,53 @@ test('深資童軍肩章豁免規則與示範紀錄冊四階統計', () => {
   assert.equal(l2.percent, 100);
 });
 
-test('與 vsbadge 雙向匯出匯入進度且不覆蓋既有領袖簽名', () => {
+test('與 vsbadge 純進度同步：BOOK 匯出一律為待核實（pending）、BADGE 匯入只信領袖已核實且零個人資料', () => {
   const demo = demoBook();
   const exported = exportForVsBadge(demo, 'HKI-28');
-  assert.equal(exported.schema, 'vsbadge.progress.v1');
-  assert.equal(exported.progress['25081420']['L1-ACT-01'], '2025-10-18');
-  assert.equal(exported.badges.L3, '2026-09-12');
+  assert.equal(exported.schema, 'vsbadge.pending.v1');
+  assert.equal(exported.status, 'pending');
+  assert.equal(exported.confirmed, false);
+  assert.equal(exported.privacy, 'progress-only');
+  assert.equal('members' in exported, false);
+  assert.equal('progress' in exported, false);
+  assert.ok(exported.pendingRequests.some((r) => r.item_id === 'L1-ACT-01' && r.status === 'pending'));
 
+  // 待領袖核實檔不可倒灌當成已核實進度
   const blank = newBook({
     member: { scoutId: '25081420' },
     progress: {
       'L1-ACT-01': { date: '2025-09-30', assessor: '原團長', signature: { png: 'data:image/png;base64,AAA' } },
     },
   });
-  const res = importFromVsBadge(exported, blank);
-  assert.ok(res.imported >= 38);
-  assert.equal(res.book.member.nameZh, '張芷晴');
-  // 既有簽名與日期必須保留不被覆蓋
-  assert.equal(res.book.progress['L1-ACT-01'].date, '2025-09-30');
-  assert.equal(res.book.progress['L1-ACT-01'].assessor, '原團長');
+  assert.throws(() => importFromVsBadge(exported, blank), /待領袖核實/);
+
+  // 模擬 vsbadge 領袖已核實資料（夾雜個人資料與 pendingRequests 未核實資料）
+  const vsbadgePayload = {
+    members: [{ ymis: '25081420', name: '張芷晴', en: 'CHEUNG Tsz-ching', email: 'secret@example.com' }],
+    progress: {
+      '25081420': {
+        'L1-ACT-01': { date: '2025-10-18', confirmer: '陳志豪 VSL' },
+        'L2-CAMP-01': { date: '2026-02-01', confirmer: '陳志豪 VSL' },
+        'OT-FA': { date: '2026-05-03', confirmer: '陳志豪 VSL' },
+      },
+    },
+    pendingRequests: [
+      { ymis: '25081420', item_id: 'L3-PROJECT-01', requested_date: '2026-10-01', status: 'pending' },
+    ],
+  };
+
+  const res = importFromVsBadge(vsbadgePayload, blank);
+  assert.equal(res.imported, 3);
+  assert.equal(res.skippedPending, 1);
+  // 絕不錄入個人資料
+  assert.equal(res.book.member.nameZh, '');
+  // 無條件相信領袖在 vsbadge 核實的日期與核實者，同時保留本機既有領袖手寫簽名墨跡
+  assert.equal(res.book.progress['L1-ACT-01'].date, '2025-10-18');
+  assert.equal(res.book.progress['L1-ACT-01'].assessor, '陳志豪 VSL');
+  assert.equal(res.book.progress['L1-ACT-01'].confirmedByBadge, true);
   assert.ok(res.book.progress['L1-ACT-01'].signature.png);
+  // 未核實（pending）項目絕不錄入
+  assert.equal(res.book.progress['L3-PROJECT-01'], undefined);
   assert.equal(res.book.pages.p34.faCompletedDate, '2026-05-03');
   assert.equal(APP_VERSION, 'v1.0.0');
 });

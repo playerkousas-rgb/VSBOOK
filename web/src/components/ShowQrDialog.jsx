@@ -299,8 +299,8 @@ export default function ShowQrDialog({ open, onClose }) {
             <video ref={camVideoRef} playsInline muted autoPlay />
             <p className="tiny">
               {isEn
-                ? 'Point at the Leader’s Return QR or Universal One-Sign Batch QR.'
-                : '對準領袖手機上的「核簽回傳碼」或「一簽全體通用核簽碼」即可自動讀取。'}
+                ? 'Point at the Leader’s Sign-off Return QR.'
+                : '對準領袖手機上的「核簽回傳碼」二維碼即可自動讀取寫入。'}
             </p>
           </div>
         )}

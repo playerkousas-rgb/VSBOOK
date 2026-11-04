@@ -1,20 +1,20 @@
 /* ==========================================================================
    Vercel Serverless Function — GET / POST /api/vsbadge
    --------------------------------------------------------------------------
-   與兄弟系統 vsbadge 進行伺服器端純進度互通（不錄入個人資料，只錄入進度）：
-   1. 預設自動對接公開 vsbadge 主站 `https://vsbadge.vercel.app`（可由環境變數 `VSBADGE_ORIGIN` 覆寫）。
-   2. 亦相容直接設定 `TROOP_<ID>_NAME` / `TROOP_<ID>_BACKEND` / `TROOP_<ID>_APIKEY` 直連旅團 GAS。
-   3. 前端永不提交後端 URL（杜絕 SSRF）；只開放進度操作白名單：
-      - GET  /api/vsbadge  → { success: true, origin, troops }
-      - POST /api/vsbadge  → action ∈ { login, logout, load, save, saveOtherBadge }
-   4. 伺服器端強制過濾個人資料欄位：禁止新增／修改帳戶，只讀寫 SCOUT ID（YMIS）與訓練進度。
+   個人電子紀錄冊（VSBOOK）與旅團進度表（vsbadge）純進度互通橋接：
+   1. 不錄入個人資料，只錄入進度（伺服器端剝除所有姓名、電郵、電話、其他成員資料）。
+   2. BADGE → BOOK（action = 'load'）：只回傳該成員在 vsbadge 內「領袖已核實」的進度（`progress` / `otherBadges`），
+      並另外列出「待領袖核實」（`pendingRequests`）供識別，未核實項目絕不混入已核實進度。
+   3. BOOK → BADGE（action = 'submitPending'）：嚴禁直接呼叫 `save`／`saveOtherBadge`（一律 403 拒絕）；
+      所有由 BOOK 送出的進度一律轉發至 vsbadge 的 `requestComplete`，在 vsbadge 內變成「待領袖核實（pending）」，
+      必須由領袖在 vsbadge 內 CONFIRM 方為完成，杜絕成員扮自己已完成。
    ========================================================================== */
 
 const DEFAULT_VSBADGE_ORIGIN = 'https://vsbadge.vercel.app';
 const EXEC_URL_RE = /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]{10,}\/exec\/?$/i;
 const TEST_LOCAL_RE = /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?(\/[A-Za-z0-9._~\-/?=&%]*)?$/;
-const ALLOWED_ACTIONS = new Set(['login', 'logout', 'load', 'save', 'saveOtherBadge']);
-const MAX_BODY_BYTES = 1024 * 1024;
+const ALLOWED_ACTIONS = new Set(['login', 'logout', 'load', 'submitPending']);
+const MAX_BODY_BYTES = 512 * 1024;
 const TIMEOUT_MS = 30000;
 
 export function resolveVsBadgeOrigin() {
@@ -77,6 +77,15 @@ function getLocalTroopRegistry() {
   return out;
 }
 
+function sameId(a, b) {
+  const x = String(a ?? '').trim();
+  const y = String(b ?? '').trim();
+  if (!x || !y) return false;
+  if (x.toLowerCase() === y.toLowerCase()) return true;
+  if (/^\d+$/.test(x) && /^\d+$/.test(y)) return x.padStart(10, '0') === y.padStart(10, '0');
+  return false;
+}
+
 async function readBody(req) {
   if (req.body && typeof req.body === 'object') return req.body;
   if (typeof req.body === 'string') {
@@ -113,103 +122,124 @@ function sendJson(res, status, obj) {
   }
 }
 
-/** 剝除任何個人私隱欄位，只保留成員編號、顯示名稱與純進度日期。 */
-export function sanitizeLoadResponse(raw) {
+/**
+ * 只抽取該名成員自己的「領袖已核實進度」及「待領袖核實清單」，剝除所有個人資料與其他成員紀錄。
+ */
+export function filterPersonalConfirmedLoad(raw, targetYmis) {
   if (!raw || typeof raw !== 'object') return { success: false, error: '無效回應' };
   if (!raw.success) return { success: false, error: String(raw.error || '讀取進度失敗') };
 
-  const members = Array.isArray(raw.members)
-    ? raw.members
-        .filter((m) => m && typeof m === 'object' && (m.ymis || m.scoutId))
-        .map((m) => {
-          const ymis = String(m.ymis || m.scoutId || '').trim();
-          return {
-            ymis,
-            scoutId: ymis,
-            name: String(m.name || '').trim().slice(0, 40),
-            role: String(m.role || 'member').trim(),
-            joinDate: String(m.joinDate || '').trim().slice(0, 10),
-          };
-        })
-    : [];
+  const cleanTarget = String(targetYmis || '').trim();
+  if (!cleanTarget) return { success: false, error: '缺少童軍成員編號（SCOUT ID）' };
 
-  const flatProgress = {};
-  const mergeProgress = (source) => {
+  const confirmedItems = {};
+  const collectFrom = (source) => {
     if (!source || typeof source !== 'object') return;
     for (const [ymis, items] of Object.entries(source)) {
-      if (!items || typeof items !== 'object' || ymis === '說明') continue;
-      if (!flatProgress[ymis]) flatProgress[ymis] = {};
+      if (!sameId(ymis, cleanTarget) || !items || typeof items !== 'object') continue;
       for (const [itemId, val] of Object.entries(items)) {
         const date = typeof val === 'string' ? val : val?.date || '';
-        if (date) flatProgress[ymis][itemId] = String(date).slice(0, 10);
+        const confirmer = typeof val === 'object' ? String(val?.confirmer || '').trim() : '';
+        if (!date) continue;
+        confirmedItems[itemId] = {
+          date: String(date).slice(0, 10),
+          ...(confirmer ? { confirmer: confirmer.slice(0, 60) } : {}),
+        };
       }
     }
   };
-  mergeProgress(raw.flatProgress);
-  mergeProgress(raw.progress);
+  collectFrom(raw.flatProgress);
+  collectFrom(raw.progress);
 
-  const otherBadges = {};
+  const confirmedOther = {};
   if (raw.otherBadges && typeof raw.otherBadges === 'object') {
     for (const [ymis, map] of Object.entries(raw.otherBadges)) {
-      if (!map || typeof map !== 'object') continue;
-      otherBadges[ymis] = {};
+      if (!sameId(ymis, cleanTarget) || !map || typeof map !== 'object') continue;
       for (const [badgeId, val] of Object.entries(map)) {
         const date = typeof val === 'string' ? val : val?.date || '';
-        if (date) otherBadges[ymis][badgeId] = { date: String(date).slice(0, 10) };
+        const cert = typeof val === 'object' ? String(val?.cert || '').trim() : '';
+        if (!date) continue;
+        confirmedOther[badgeId] = {
+          date: String(date).slice(0, 10),
+          ...(cert ? { cert: cert.slice(0, 60) } : {}),
+        };
       }
+    }
+  }
+
+  const pendingRequests = [];
+  if (Array.isArray(raw.pendingRequests)) {
+    for (const req of raw.pendingRequests) {
+      if (!req || typeof req !== 'object') continue;
+      if (!sameId(req.ymis, cleanTarget)) continue;
+      if (String(req.status || 'pending').toLowerCase() === 'approved') continue;
+      pendingRequests.push({
+        ymis: cleanTarget,
+        item_id: String(req.item_id || req.itemId || '').trim(),
+        requested_date: String(req.requested_date || '').slice(0, 10),
+        status: 'pending',
+      });
     }
   }
 
   return {
     success: true,
     privacy: 'progress-only',
-    members,
-    flatProgress,
-    progress: flatProgress,
-    otherBadges,
+    scoutId: cleanTarget,
+    progress: { [cleanTarget]: confirmedItems },
+    otherBadges: { [cleanTarget]: confirmedOther },
+    pendingRequests,
   };
 }
 
-/** 清洗寫入 vsbadge 的進度陣列（嚴禁夾帶任何個人資料欄位）。 */
-export function sanitizeSaveChanges(changes, fallbackConfirmer = '') {
-  if (!Array.isArray(changes)) return [];
+/** 清洗成員送交 vsbadge「待領袖核實」的申報項目（零個人資料，硬性轉為 requestComplete）。 */
+export function sanitizePendingSubmissions(items) {
+  if (!Array.isArray(items)) return [];
   const out = [];
-  for (const c of changes) {
-    if (!c || typeof c !== 'object') continue;
-    const ymis = String(c.ymis || c.scoutId || '').trim().slice(0, 32);
-    const itemId = String(c.itemId || '').trim().slice(0, 64);
-    const date = String(c.date || '').trim().slice(0, 10);
-    if (!ymis || !itemId || (!c.uncomplete && !/^\d{4}-\d{2}-\d{2}$/.test(date))) continue;
+  for (const it of items) {
+    if (!it || typeof it !== 'object') continue;
+    const itemId = String(it.itemId || it.item_id || '').trim().slice(0, 64);
+    const date = String(it.date || it.requested_date || '').trim().slice(0, 10);
+    if (!itemId || !/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
     out.push({
-      ymis,
       itemId,
-      date: c.uncomplete ? '' : date,
-      uncomplete: Boolean(c.uncomplete),
-      confirmer: String(c.confirmer || fallbackConfirmer || '').trim().slice(0, 60),
-      ...(c.note ? { note: String(c.note).trim().slice(0, 200) } : {}),
+      itemName: String(it.itemName || it.item_name || itemId).trim().slice(0, 120),
+      requested_date: date,
+      evidence: String(it.evidence || '由 VSBOOK 電子紀錄冊提交（待領袖核實）').trim().slice(0, 200),
     });
   }
   return out;
 }
 
-export function sanitizeOtherBadgeRecords(records) {
-  if (!Array.isArray(records)) return [];
-  const out = [];
-  for (const r of records) {
-    if (!r || typeof r !== 'object') continue;
-    const ymis = String(r.ymis || r.scoutId || '').trim().slice(0, 32);
-    const badgeId = String(r.badgeId || '').trim().slice(0, 64);
-    const date = String(r.date || '').trim().slice(0, 10);
-    if (!ymis || !badgeId || !/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
-    out.push({
-      ymis,
-      badgeId,
-      badgeName: String(r.badgeName || badgeId).trim().slice(0, 80),
-      date,
-      cert: String(r.cert || '').trim().slice(0, 60),
-    });
+async function callVsBadgeAction({ origin, directTroop, troopId, action, data }) {
+  if (directTroop) {
+    let up;
+    if (action === 'load') {
+      const qs = new URLSearchParams({ action: 'load', apikey: directTroop.apikey, token: data.token });
+      up = await fetch(`${directTroop.backend}?${qs.toString()}`, {
+        method: 'GET',
+        redirect: 'follow',
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+    } else {
+      up = await fetch(directTroop.backend, {
+        method: 'POST',
+        redirect: 'follow',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ ...data, action, apikey: directTroop.apikey }),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+    }
+    return up.json().catch(() => null);
   }
-  return out;
+
+  const up = await fetch(`${origin}/api/proxy`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json; charset=utf-8', Accept: 'application/json' },
+    body: JSON.stringify({ troopId, action, data }),
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
+  return up.json().catch(() => null);
 }
 
 export default async function handler(req, res) {
@@ -238,7 +268,7 @@ export default async function handler(req, res) {
         }
       }
     } catch {
-      /* 若離線或上游不可達，仍回傳本機已設定的旅團清單 */
+      /* 離線時仍回傳本機設定 */
     }
     return sendJson(res, 200, {
       success: true,
@@ -265,102 +295,113 @@ export default async function handler(req, res) {
   if (!ALLOWED_ACTIONS.has(action)) {
     return sendJson(res, 403, {
       success: false,
-      error: 'VSBOOK 只支援同步訓練進度（不錄入或修改任何個人資料）',
+      error: 'VSBOOK 不允許直接寫入已核實進度或個人資料；進度送交 vsbadge 時一律須經領袖核實（pending）',
     });
   }
   if (!/^[0-9A-Za-z_-]{1,32}$/.test(troopId)) {
     return sendJson(res, 400, { success: false, error: '請選擇有效的旅團編號' });
   }
 
-  let outboundData = {};
-  if (action === 'login') {
-    const login_id = String(rawData.login_id || '').trim().slice(0, 120);
-    const password = String(rawData.password || '');
-    if (!login_id || !password) {
-      return sendJson(res, 400, { success: false, error: '請輸入 vsbadge 領袖帳號及密碼' });
+  const directTroop = localRegistry[troopId];
+
+  try {
+    if (action === 'login') {
+      const login_id = String(rawData.login_id || '').trim().slice(0, 120);
+      const password = String(rawData.password || '');
+      if (!login_id || !password) {
+        return sendJson(res, 400, { success: false, error: '請輸入童軍成員編號（YMIS）及密碼' });
+      }
+      const rawJson = await callVsBadgeAction({
+        origin,
+        directTroop,
+        troopId,
+        action: 'login',
+        data: { login_id, password },
+      });
+      if (!rawJson || typeof rawJson !== 'object') {
+        return sendJson(res, 502, { success: false, error: 'vsbadge 回應異常，請稍後重試' });
+      }
+      if (!rawJson.success) {
+        return sendJson(res, 200, { success: false, error: String(rawJson.error || '登入失敗') });
+      }
+      // 不傳回姓名或電郵等個人資料，只保留 ymis 編號與 token
+      return sendJson(res, 200, {
+        success: true,
+        token: rawJson.token,
+        ymis: String(rawJson.user?.ymis || login_id).trim(),
+      });
     }
-    outboundData = { login_id, password };
-  } else {
+
     const token = String(rawData.token || '').trim();
     if (token.length < 4 || token.length > 4096) {
       return sendJson(res, 401, { success: false, error: '尚未登入 vsbadge 或登入已過期' });
     }
-    if (action === 'logout' || action === 'load') {
-      outboundData = { token };
-    } else if (action === 'save') {
-      const confirmer = String(rawData.confirmer || '').trim().slice(0, 60);
-      const changes = sanitizeSaveChanges(rawData.changes, confirmer);
-      if (!changes.length) {
-        return sendJson(res, 400, { success: false, error: '沒有有效的進度項目需要寫入' });
-      }
-      outboundData = { token, confirmer, changes };
-    } else if (action === 'saveOtherBadge') {
-      const records = sanitizeOtherBadgeRecords(rawData.records);
-      if (!records.length) {
-        return sendJson(res, 400, { success: false, error: '沒有有效的其他獎章進度需要寫入' });
-      }
-      outboundData = { token, records };
-    }
-  }
 
-  try {
-    const directTroop = localRegistry[troopId];
-    let rawJson = null;
-
-    if (directTroop) {
-      let up;
-      if (action === 'load') {
-        const qs = new URLSearchParams({ action: 'load', apikey: directTroop.apikey, token: outboundData.token });
-        up = await fetch(`${directTroop.backend}?${qs.toString()}`, {
-          method: 'GET',
-          redirect: 'follow',
-          signal: AbortSignal.timeout(TIMEOUT_MS),
-        });
-      } else {
-        up = await fetch(directTroop.backend, {
-          method: 'POST',
-          redirect: 'follow',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({ ...outboundData, action, apikey: directTroop.apikey }),
-          signal: AbortSignal.timeout(TIMEOUT_MS),
-        });
-      }
-      rawJson = await up.json().catch(() => null);
-    } else {
-      const up = await fetch(`${origin}/api/proxy`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json; charset=utf-8', Accept: 'application/json' },
-        body: JSON.stringify({ troopId, action, data: outboundData }),
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-      });
-      rawJson = await up.json().catch(() => null);
-    }
-
-    if (!rawJson || typeof rawJson !== 'object') {
-      return sendJson(res, 502, { success: false, error: 'vsbadge 後端回應格式異常，請稍後重試' });
+    if (action === 'logout') {
+      const rawJson = await callVsBadgeAction({ origin, directTroop, troopId, action: 'logout', data: { token } });
+      return sendJson(res, 200, rawJson || { success: true });
     }
 
     if (action === 'load') {
-      return sendJson(res, 200, sanitizeLoadResponse(rawJson));
+      const ymis = String(rawData.ymis || '').trim().slice(0, 32);
+      if (!ymis) {
+        return sendJson(res, 400, { success: false, error: '缺少童軍成員編號（SCOUT ID）' });
+      }
+      const rawJson = await callVsBadgeAction({ origin, directTroop, troopId, action: 'load', data: { token } });
+      if (!rawJson || typeof rawJson !== 'object') {
+        return sendJson(res, 502, { success: false, error: 'vsbadge 後端回應異常' });
+      }
+      return sendJson(res, 200, filterPersonalConfirmedLoad(rawJson, ymis));
     }
 
-    if (action === 'login' && rawJson.success) {
+    if (action === 'submitPending') {
+      const ymis = String(rawData.ymis || '').trim().slice(0, 32);
+      const items = sanitizePendingSubmissions(rawData.items);
+      if (!ymis) {
+        return sendJson(res, 400, { success: false, error: '缺少童軍成員編號（SCOUT ID）' });
+      }
+      if (!items.length) {
+        return sendJson(res, 400, { success: false, error: '沒有需要送交待核實的新進度項目' });
+      }
+
+      let submitted = 0;
+      const failed = [];
+      for (const item of items) {
+        // 強制只呼叫 requestComplete，在 vsbadge 內寫入「待批完成（status: pending）」工作表
+        const resJson = await callVsBadgeAction({
+          origin,
+          directTroop,
+          troopId,
+          action: 'requestComplete',
+          data: {
+            token,
+            ymis,
+            itemId: item.itemId,
+            itemName: item.itemName,
+            requested_date: item.requested_date,
+            evidence: item.evidence,
+          },
+        });
+        if (resJson?.success) submitted += 1;
+        else failed.push({ itemId: item.itemId, error: String(resJson?.error || '提交失敗') });
+      }
+
       return sendJson(res, 200, {
-        success: true,
-        token: rawJson.token,
-        user: {
-          name: String(rawJson.user?.name || '').trim(),
-          role: String(rawJson.user?.role || '').trim(),
-        },
+        success: submitted > 0 || failed.length === 0,
+        status: 'pending',
+        confirmed: false,
+        submitted,
+        failed,
+        ...(failed.length && submitted === 0 ? { error: failed[0].error } : {}),
       });
     }
 
-    return sendJson(res, 200, rawJson);
+    return sendJson(res, 400, { success: false, error: '不支援的操作' });
   } catch (e) {
     const timeout = e && (e.name === 'TimeoutError' || e.name === 'AbortError');
     return sendJson(res, timeout ? 504 : 502, {
       success: false,
-      error: timeout ? '連接 vsbadge 後端逾時，請稍後重試' : '暫時無法連接 vsbadge 雲端後端，可先使用純進度 JSON 匯入／匯出',
+      error: timeout ? '連接 vsbadge 逾時，請稍後重試' : '暫時無法連接 vsbadge 後端，請稍後重試',
     });
   }
 }

@@ -38,21 +38,6 @@ export function sameScoutId(a, b) {
   return false;
 }
 
-/** 可供領袖「一簽簽發」與 vsbadge 互通的全部訓練細項（L1–L4 葉節點＋OT 其他獎章）。 */
-export const SIGNABLE_ITEMS = [
-  ...SYLLABUS_ITEMS.filter((it) => !it.noDirectCheck && !(Array.isArray(it.subItems) && it.subItems.length > 0)),
-  ...OTHER_BADGES.map((ob) => ({
-    ...ob,
-    badgeId: 'OT',
-    badgeName: '其他獎章',
-    badgeEn: 'Other Badges',
-    segmentCode: 'OT',
-    segmentName: '其他獎章',
-    segmentEn: 'Other Badges',
-    isOtherBadge: true,
-  })),
-];
-
 /** 保持 scoutId 與 memberNo 同步，清除舊 ymis 欄位。 */
 export function syncIdentity(member) {
   if (!member) return member;
@@ -321,410 +306,329 @@ export function membershipStatus(book) {
   };
 }
 
-// ------------------------------------------------- vsbadge 雙向互通
+// ------------------------------------------------- vsbadge 雙向進度互通（個人 BOOK ⇄ 旅團 BADGE）
+// 三大鐵律：
+// 1. 不錄入個人資料，只錄入進度（只以 SCOUT ID／YMIS 對齊，絕不傳送或覆寫姓名、電話、地址、身份證、相片等個人資料）。
+// 2. BOOK → BADGE：從個人紀錄冊輸出的進度一律標記為「待領袖核實（pending）」，領袖必須在 vsbadge 內 CONFIRM 方為生效，避免成員扮已完成。
+// 3. BADGE → BOOK：無條件相信 vsbadge 內已獲領袖核實的進度（直接寫入／更新紀錄冊）；未核實（pending／draft／rejected）的一律不錄入。
 
-function collectFlatProgress(book) {
-  const progress = {};
-  Object.entries(book?.progress || {}).forEach(([itemId, state]) => {
-    if (state?.date) progress[itemId] = state.date;
+const UNCONFIRMED_STATUSES = new Set([
+  'pending',
+  'local_draft',
+  'draft',
+  'rejected',
+  'unverified',
+  'unconfirmed',
+]);
+
+function isConfirmedBadgeEntry(val) {
+  if (!val) return false;
+  if (typeof val === 'string') return Boolean(val.trim());
+  if (typeof val !== 'object') return false;
+  if (val.confirmed === false || val.verified === false || val.pending === true) return false;
+  const st = String(val.status || '').trim().toLowerCase();
+  if (st && UNCONFIRMED_STATUSES.has(st)) return false;
+  return Boolean(String(val.date || '').trim());
+}
+
+/** 收集個人 BOOK 內已填寫但尚未獲 vsbadge 核實的項目（供送交 vsbadge 轉為「待領袖核實」）。 */
+export function collectPendingForVsBadge(book, remoteConfirmed = {}, remotePendingIds = []) {
+  const pendingSet = new Set((remotePendingIds || []).map((x) => String(x || '').trim()));
+  const rawEntries = new Map();
+
+  Object.entries(book?.progress || {}).forEach(([itemId, entry]) => {
+    if (!ITEM_INDEX[itemId] || !entry?.date) return;
+    rawEntries.set(itemId, {
+      itemId,
+      itemName: ITEM_INDEX[itemId]?.name || itemId,
+      date: String(entry.date).trim(),
+      cert: String(entry.cert || '').trim(),
+      confirmedByBadge: Boolean(entry.confirmedByBadge),
+    });
   });
-  if (book?.pages?.p34?.swaCompletedDate && !progress['OT-WORLD-SW-AWARD']) {
-    progress['OT-WORLD-SW-AWARD'] = book.pages.p34.swaCompletedDate;
+
+  if (book?.pages?.p34?.swaCompletedDate && !rawEntries.has('OT-WORLD-SW-AWARD')) {
+    rawEntries.set('OT-WORLD-SW-AWARD', {
+      itemId: 'OT-WORLD-SW-AWARD',
+      itemName: ITEM_INDEX['OT-WORLD-SW-AWARD']?.name || 'OT-WORLD-SW-AWARD',
+      date: String(book.pages.p34.swaCompletedDate).trim(),
+      cert: String(book.pages.p34.swaCertNo || '').trim(),
+      confirmedByBadge: false,
+    });
   }
-  if (book?.pages?.p34?.faCompletedDate && !progress['OT-FA']) {
-    progress['OT-FA'] = book.pages.p34.faCompletedDate;
+  if (book?.pages?.p34?.faCompletedDate && !rawEntries.has('OT-FA')) {
+    rawEntries.set('OT-FA', {
+      itemId: 'OT-FA',
+      itemName: ITEM_INDEX['OT-FA']?.name || 'OT-FA',
+      date: String(book.pages.p34.faCompletedDate).trim(),
+      cert: String(book.pages.p34.faCertNo || '').trim(),
+      confirmedByBadge: false,
+    });
   }
-  if (book?.pages?.p35?.completedDate && !progress['OT-ROVER-LINK']) {
-    progress['OT-ROVER-LINK'] = book.pages.p35.completedDate;
-  }
-  return progress;
-}
-
-function collectBadgeDates(book) {
-  const badges = {};
-  if (book?.pages?.p10?.investitureDate) badges.L1 = book.pages.p10.investitureDate;
-  if (book?.pages?.p13?.completedDate) badges.L2 = book.pages.p13.completedDate;
-  if (book?.pages?.p20?.completedDate) badges.L3 = book.pages.p20.completedDate;
-  if (book?.pages?.p33?.completedDate) badges.L4 = book.pages.p33.completedDate;
-  return badges;
-}
-
-/** 純進度匯出給 vsbadge（不錄入任何個人資料，只保留 SCOUT ID 與完成日期）。 */
-export function exportProgressOnlyForVsBadge(book, troopId = '') {
-  const sid = scoutId(book?.member) || 'UNSET';
-  const progress = collectFlatProgress(book);
-  const badges = collectBadgeDates(book);
-  return {
-    info: 'VSBOOK 純進度匯出 · 不含任何個人資料（只含 SCOUT ID 與訓練進度）',
-    privacy: 'progress-only',
-    troopId,
-    exportedAt: new Date().toISOString(),
-    progress: { [sid]: progress },
-    progress_mock: { 說明: 'VSBOOK 純進度匯出（不含個人資料）', [sid]: progress },
-    badges,
-    source: 'VSBOOK',
-    schema: 'vsbadge.progress.v1',
-  };
-}
-
-export function exportForVsBadge(book, troopId = '', opts = {}) {
-  if (opts?.progressOnly) return exportProgressOnlyForVsBadge(book, troopId);
-  const sid = scoutId(book?.member) || 'UNSET';
-  const progress = collectFlatProgress(book);
-  const badges = collectBadgeDates(book);
-
-  return {
-    info: 'VSBOOK 匯出 · 可直接匯入 vsbadge（2026 第十一版深資童軍訓練綱要）',
-    troopId,
-    exportedAt: new Date().toISOString(),
-    members: [
-      {
-        scoutId: sid === 'UNSET' ? '' : sid,
-        name: book?.member?.nameZh || '',
-        nameEn: book?.member?.nameEn || '',
-        role: 'member',
-        joinDate: book?.member?.dateJoined || '',
-        unit: book?.member?.unit || '',
-        group: book?.member?.group || '',
-      },
-    ],
-    progress: { [sid]: progress },
-    progress_mock: { 說明: 'VSBOOK 匯出進度', [sid]: progress },
-    badges,
-    source: 'VSBOOK',
-    schema: 'vsbadge.progress.v1',
-  };
-}
-
-/** 計算單一成員純進度表的四階（L1–L4）與其他獎章完成統計。 */
-export function rosterMemberStats(flatProgress = {}, otherBadges = {}) {
-  const progressObj = {};
-  Object.entries(flatProgress || {}).forEach(([id, val]) => {
-    const date = typeof val === 'string' ? val : val?.date || '';
-    if (date) progressObj[id] = { date };
-  });
-  Object.entries(otherBadges || {}).forEach(([id, val]) => {
-    const date = typeof val === 'string' ? val : val?.date || '';
-    if (date && !progressObj[id]) progressObj[id] = { date };
-  });
-  const pseudoBook = newBook({ progress: progressObj });
-  const l1 = badgeStats(pseudoBook, 'L1');
-  const l2 = badgeStats(pseudoBook, 'L2');
-  const l3 = badgeStats(pseudoBook, 'L3');
-  const l4 = badgeStats(pseudoBook, 'L4');
-  const otDone = OTHER_BADGES.filter((ob) => Boolean(progressObj[ob.id]?.date)).length;
-  const total = l1.total + l2.total + l3.total + l4.total;
-  const done = l1.done + l2.done + l3.done + l4.done;
-  return {
-    l1,
-    l2,
-    l3,
-    l4,
-    otDone,
-    otTotal: OTHER_BADGES.length,
-    done,
-    total,
-    percent: total ? Math.round((done / total) * 100) : 0,
-  };
-}
-
-/**
- * 解析 vsbadge 後端 load 回應或進度 JSON，轉為「只含進度、零個人資料」的全團成員清單。
- * 任何電話、電郵、地址、出生日期、身份證、相片、緊急聯絡人等個人欄位一律丟棄。
- */
-export function parseVsBadgeRoster(json) {
-  if (!json || typeof json !== 'object') throw new Error('vsbadge 資料格式不正確');
-
-  const byId = new Map();
-  const ensure = (rawId, rawLabel = '', rawRole = 'member', rawJoinDate = '') => {
-    const sid = normalizeScoutId(rawId);
-    if (!sid || sid === '說明') return null;
-    let key = sid;
-    for (const existing of byId.keys()) {
-      if (sameScoutId(existing, sid)) {
-        key = existing;
-        break;
-      }
-    }
-    if (!byId.has(key)) {
-      byId.set(key, {
-        scoutId: key,
-        label: String(rawLabel || '').trim().slice(0, 40),
-        role: String(rawRole || 'member').trim(),
-        joinDate: String(rawJoinDate || '').trim().slice(0, 10),
-        progress: {},
-        otherBadges: {},
-      });
-    } else {
-      const cur = byId.get(key);
-      if (!cur.label && rawLabel) cur.label = String(rawLabel).trim().slice(0, 40);
-      if (!cur.joinDate && rawJoinDate) cur.joinDate = String(rawJoinDate).trim().slice(0, 10);
-    }
-    return byId.get(key);
-  };
-
-  if (Array.isArray(json.members)) {
-    json.members.forEach((m) => {
-      if (!m || typeof m !== 'object') return;
-      const role = String(m.role || 'member');
-      if (['branch_leader', 'leader', 'gsl', 'super_admin'].includes(role) && !m.ymis && !m.scoutId) return;
-      const sid = m.ymis || m.scoutId || m.memberNo;
-      if (!sid) return;
-      ensure(sid, m.name || m.nameZh || '', role, m.joinDate || '');
+  if (book?.pages?.p35?.completedDate && !rawEntries.has('OT-ROVER-LINK')) {
+    rawEntries.set('OT-ROVER-LINK', {
+      itemId: 'OT-ROVER-LINK',
+      itemName: ITEM_INDEX['OT-ROVER-LINK']?.name || 'OT-ROVER-LINK',
+      date: String(book.pages.p35.completedDate).trim(),
+      cert: String(book.pages.p35.certNo || '').trim(),
+      confirmedByBadge: false,
     });
   }
 
-  const progSources = [json.flatProgress, json.progress, json.progress_mock].filter((x) => x && typeof x === 'object');
-  for (const src of progSources) {
-    for (const [sid, map] of Object.entries(src)) {
-      if (sid === '說明' || !map || typeof map !== 'object') continue;
-      if (ITEM_INDEX[sid]) continue;
-      const rec = ensure(sid);
-      if (!rec) continue;
-      for (const [itemId, val] of Object.entries(map)) {
-        if (!ITEM_INDEX[itemId]) continue;
-        const date = typeof val === 'string' ? val : val?.date || '';
-        if (date) rec.progress[itemId] = date;
-      }
-    }
+  const out = [];
+  for (const [itemId, row] of rawEntries.entries()) {
+    if (row.confirmedByBadge) continue;
+    if (remoteConfirmed && remoteConfirmed[itemId]) continue;
+    if (pendingSet.has(itemId)) continue;
+    out.push({
+      itemId: row.itemId,
+      itemName: row.itemName,
+      date: row.date,
+      cert: row.cert,
+      evidence: row.cert
+        ? `VSBOOK 紀錄冊申報（證書：${row.cert}）`
+        : '由 VSBOOK 電子紀錄冊申報（待領袖核實）',
+    });
   }
-
-  if (json.otherBadges && typeof json.otherBadges === 'object') {
-    for (const [sid, map] of Object.entries(json.otherBadges)) {
-      if (!map || typeof map !== 'object') continue;
-      const rec = ensure(sid);
-      if (!rec) continue;
-      for (const [badgeId, val] of Object.entries(map)) {
-        if (!ITEM_INDEX[badgeId]) continue;
-        const date = typeof val === 'string' ? val : val?.date || '';
-        if (date) {
-          rec.otherBadges[badgeId] = date;
-          if (!rec.progress[badgeId]) rec.progress[badgeId] = date;
-        }
-      }
-    }
-  }
-
-  const members = [...byId.values()]
-    .filter((m) => !['branch_leader', 'leader', 'gsl', 'super_admin'].includes(m.role))
-    .sort((a, b) => String(a.scoutId).localeCompare(String(b.scoutId)));
-
-  return {
-    troopId: String(json.troopId || '').trim(),
-    members,
-  };
+  return out;
 }
 
 /**
- * 將掃描到的單一成員 VS1 二維碼併入領袖全團進度清單（只保留 SCOUT ID 與進度，主動剝除個人私隱欄位）。
+ * 輸出個人 BOOK 進度供 vsbadge 錄入：
+ * - 不含任何個人資料（只有童軍成員編號 SCOUT ID／YMIS 與進度項目）；
+ * - 全部標記為 `status: 'pending'`、`confirmed: false`（待領袖核實），絕不輸出為已核實 `progress`，防止成員扮已完成。
  */
-export function mergeMemberPayloadIntoRoster(roster = [], payload) {
-  const sid = normalizeScoutId(payload?.scoutId || payload?.member?.scoutId || payload?.member?.memberNo);
-  if (!sid) {
-    throw new Error('此二維碼未包含童軍成員編號（SCOUT ID），請成員先填寫第 1 頁編號後再出示');
-  }
-  const next = (roster || []).map((m) => ({
-    scoutId: m.scoutId,
-    label: m.label || '',
-    role: m.role || 'member',
-    joinDate: m.joinDate || '',
-    progress: { ...(m.progress || {}) },
-    otherBadges: { ...(m.otherBadges || {}) },
-  }));
-
-  const label = String(payload?.member?.nameZh || payload?.member?.nameEn || '').trim().slice(0, 40);
-  let target = next.find((m) => sameScoutId(m.scoutId, sid));
-  if (!target) {
-    target = { scoutId: sid, label, role: 'member', joinDate: '', progress: {}, otherBadges: {} };
-    next.push(target);
-  } else if (!target.label && label) {
-    target.label = label;
-  }
-
-  Object.entries(payload?.progress || {}).forEach(([itemId, val]) => {
-    if (!ITEM_INDEX[itemId]) return;
-    const date = typeof val === 'string' ? val : val?.date || '';
-    if (!date) return;
-    target.progress[itemId] = date;
-    if (ITEM_INDEX[itemId]?.isOtherBadge) target.otherBadges[itemId] = date;
+export function exportForVsBadge(book, troopId = '') {
+  const sid = scoutId(book?.member) || 'UNSET';
+  const cleanSid = sid === 'UNSET' ? '' : sid;
+  const items = collectPendingForVsBadge(book);
+  const pendingProgress = {};
+  const pendingRequests = items.map((it) => {
+    pendingProgress[it.itemId] = {
+      date: it.date,
+      ...(it.cert ? { cert: it.cert } : {}),
+      status: 'pending',
+      confirmed: false,
+    };
+    return {
+      ymis: cleanSid,
+      item_id: it.itemId,
+      item_name: it.itemName,
+      requested_date: it.date,
+      evidence: it.evidence,
+      status: 'pending',
+      confirmed: false,
+    };
   });
 
-  next.sort((a, b) => String(a.scoutId).localeCompare(String(b.scoutId)));
-  return { roster: next, scoutId: target.scoutId };
-}
-
-/**
- * 建立「一簽簽發所有成員」純進度批次資料（同時支援寫入 vsbadge 雲端 API 及匯出離線 JSON，零個人資料）。
- */
-export function buildVsBadgeBatchPayload({
-  troopId = '',
-  confirmer = '',
-  scoutIds = [],
-  itemIds = [],
-  date = today(),
-  note = 'VSBOOK 領袖一簽簽發',
-  existingRoster = [],
-}) {
-  const cleanIds = [...new Set((scoutIds || []).map(normalizeScoutId).filter(Boolean))];
-  const cleanItems = [...new Set((itemIds || []).filter((id) => Boolean(ITEM_INDEX[id])))];
-  const safeDate = /^\d{4}-\d{2}-\d{2}$/.test(String(date || '')) ? String(date) : today();
-  const safeConfirmer = String(confirmer || '').trim().slice(0, 60);
-  const safeNote = String(note || '').trim().slice(0, 200);
-
-  const changes = [];
-  const otherBadgeRecords = [];
-  const progress = {};
-
-  for (const existing of existingRoster || []) {
-    if (!existing?.scoutId) continue;
-    progress[existing.scoutId] = { ...(existing.progress || {}) };
-  }
-
-  for (const sid of cleanIds) {
-    const ymis = /^\d+$/.test(sid) && sid.length < 10 ? sid : sid;
-    if (!progress[ymis]) progress[ymis] = {};
-    for (const itemId of cleanItems) {
-      const meta = ITEM_INDEX[itemId];
-      progress[ymis][itemId] = safeDate;
-      if (meta?.isOtherBadge) {
-        otherBadgeRecords.push({
-          ymis,
-          badgeId: itemId,
-          badgeName: meta.name || itemId,
-          date: safeDate,
-          cert: '',
-        });
-      } else {
-        changes.push({
-          ymis,
-          itemId,
-          date: safeDate,
-          uncomplete: false,
-          confirmer: safeConfirmer,
-          ...(safeNote ? { note: safeNote } : {}),
-        });
-      }
-    }
-  }
-
   return {
-    changes,
-    otherBadgeRecords,
-    json: {
-      info: 'VSBOOK 領袖一簽簽發 · vsbadge 純進度批次檔（不錄入個人資料）',
-      privacy: 'progress-only',
-      troopId: String(troopId || '').trim(),
-      confirmer: safeConfirmer,
-      exportedAt: new Date().toISOString(),
-      progress,
-      progress_mock: {
-        說明: 'VSBOOK 領袖一簽簽發純進度（不含個人資料）',
-        ...progress,
-      },
-      changes,
-      otherBadgeRecords,
-      source: 'VSBOOK-LEADER-BATCH',
-      schema: 'vsbadge.progress.v1',
-    },
+    info: 'VSBOOK 成員進度申報檔 · 錄入 vsbadge 時一律為「待領袖核實」（不含個人資料）',
+    privacy: 'progress-only',
+    status: 'pending',
+    confirmed: false,
+    troopId: String(troopId || '').trim(),
+    scoutId: cleanSid,
+    ymis: cleanSid,
+    exportedAt: new Date().toISOString(),
+    pendingRequests,
+    pendingProgress: { [sid]: pendingProgress },
+    source: 'VSBOOK',
+    schema: 'vsbadge.pending.v1',
   };
 }
 
+/**
+ * 從 vsbadge 錄入已核實進度至個人 BOOK：
+ * - 無條件相信 vsbadge 內領袖已核實的進度（`progress` / `flatProgress` / `otherBadges`），直接寫入或校正紀錄冊日期與核實人；
+ * - 未核實資料（`pendingRequests`、`vsbadge.pending.v1`、`status: 'pending'`、`confirmed: false`）一律拒絕錄入；
+ * - 不錄入任何個人資料（`book.member` 的姓名、電話、地址、旅團等欄位完全保持不變）。
+ */
 export function importFromVsBadge(json, srcBook) {
   if (!json || typeof json !== 'object') throw new Error('檔案格式不正確');
+
+  if (
+    json.schema === 'vsbadge.pending.v1' ||
+    json.status === 'pending' ||
+    json.confirmed === false ||
+    (json.pendingProgress && !json.progress && !json.flatProgress && !json.otherBadges)
+  ) {
+    throw new Error('此檔案屬於「待領袖核實」申報資料，尚未經領袖在 vsbadge 核實，不會錄入紀錄冊');
+  }
+
   const next = structuredClone(srcBook);
-  const member = { ...next.member };
-  let progressMap = null;
-  let matchedBy = '檔案';
+  const mySid = scoutId(next.member);
+  let matchedBy = '';
+  const confirmedMap = {};
+  let skippedPending = 0;
 
-  const candidates = [json.progress, json.progress_mock].filter((x) => x && typeof x === 'object');
-  for (const candidate of candidates) {
-    const keys = Object.keys(candidate).filter((k) => k !== '說明');
-    if (keys.some((k) => ITEM_INDEX[k])) {
-      progressMap = candidate;
-      matchedBy = '直接進度表';
-      break;
-    }
-    const sid = scoutId(member);
-    if (sid && candidate[sid] && typeof candidate[sid] === 'object') {
-      progressMap = candidate[sid];
-      matchedBy = `SCOUT ID ${sid}`;
-      break;
-    }
-    const byName = keys.find((k) => {
-      const m = Array.isArray(json.members)
-        ? json.members.find((x) => String(x.scoutId || x.ymis) === String(k))
-        : null;
-      return m && m.name && m.name === member.nameZh;
+  // 統計屬於該成員但仍在「待領袖核實」的項目數（絕不寫入 BOOK）
+  if (Array.isArray(json.pendingRequests)) {
+    json.pendingRequests.forEach((req) => {
+      if (!req || typeof req !== 'object') return;
+      const reqId = normalizeScoutId(req.ymis || req.scoutId || '');
+      const st = String(req.status || 'pending').trim().toLowerCase();
+      if (st !== 'approved' && (!mySid || !reqId || sameScoutId(mySid, reqId))) {
+        skippedPending += 1;
+      }
     });
-    if (byName && candidate[byName]) {
-      progressMap = candidate[byName];
-      matchedBy = `姓名 ${member.nameZh}`;
-      break;
+  }
+
+  const extractMemberMap = (container) => {
+    if (!container || typeof container !== 'object') return null;
+    const keys = Object.keys(container).filter((k) => k !== '說明');
+    if (!keys.length) return null;
+
+    // 單人直接進度表 { 'L1-ACT-01': '2026-10-01', ... }
+    if (keys.some((k) => Boolean(ITEM_INDEX[k]))) {
+      matchedBy = matchedBy || '直接已核實進度表';
+      return container;
     }
-    if (keys.length && typeof candidate[keys[0]] === 'object') {
-      progressMap = candidate[keys[0]];
-      matchedBy = `第一位成員（${keys[0]}）`;
-      break;
+
+    if (mySid) {
+      const hitKey = keys.find((k) => sameScoutId(k, mySid));
+      if (hitKey && container[hitKey] && typeof container[hitKey] === 'object') {
+        matchedBy = matchedBy || `SCOUT ID ${mySid}`;
+        return container[hitKey];
+      }
+      return {};
+    }
+
+    if (keys.length === 1 && typeof container[keys[0]] === 'object') {
+      const onlyKey = normalizeScoutId(keys[0]);
+      if (onlyKey && onlyKey !== 'UNSET') {
+        next.member = { ...next.member, scoutId: onlyKey, memberNo: onlyKey };
+        syncIdentity(next.member);
+      }
+      matchedBy = matchedBy || `SCOUT ID ${onlyKey || keys[0]}`;
+      return container[keys[0]];
+    }
+
+    throw new Error('請先在第 1 頁填寫你的童軍成員編號（SCOUT ID），以便對齊 vsbadge 內屬於你的已核實進度');
+  };
+
+  let foundConfirmedContainer = false;
+
+  // 優先讀取 rich progress（含 confirmer），再補讀 flatProgress 及 progress_mock
+  for (const src of [json.progress, json.flatProgress, json.progress_mock]) {
+    if (!src || typeof src !== 'object') continue;
+    foundConfirmedContainer = true;
+    const map = extractMemberMap(src);
+    if (!map) continue;
+    for (const [itemId, val] of Object.entries(map)) {
+      if (!ITEM_INDEX[itemId]) continue;
+      if (!isConfirmedBadgeEntry(val)) {
+        skippedPending += 1;
+        continue;
+      }
+      const date = typeof val === 'string' ? val.trim() : String(val.date || '').trim();
+      const confirmer = typeof val === 'object' ? String(val.confirmer || val.assessor || '').trim() : '';
+      const cert = typeof val === 'object' ? String(val.cert || '').trim() : '';
+      const prev = confirmedMap[itemId] || {};
+      confirmedMap[itemId] = {
+        date: date || prev.date || '',
+        confirmer: confirmer || prev.confirmer || '',
+        cert: cert || prev.cert || '',
+      };
     }
   }
 
-  if (!progressMap && json.progress === undefined && json.progress_mock === undefined) {
-    const direct = Object.fromEntries(
-      Object.entries(json).filter(([k, v]) => ITEM_INDEX[k] && (typeof v === 'string' || typeof v?.date === 'string')),
-    );
-    if (Object.keys(direct).length) {
-      progressMap = direct;
-      matchedBy = '直接進度表';
+  // 讀取 vsbadge「其他獎章」（領袖已核實）
+  if (json.otherBadges && typeof json.otherBadges === 'object') {
+    foundConfirmedContainer = true;
+    const otherMap = extractMemberMap(json.otherBadges);
+    if (otherMap) {
+      for (const [badgeId, val] of Object.entries(otherMap)) {
+        if (!ITEM_INDEX[badgeId]) continue;
+        if (!isConfirmedBadgeEntry(val)) {
+          skippedPending += 1;
+          continue;
+        }
+        const date = typeof val === 'string' ? val.trim() : String(val.date || '').trim();
+        const cert = typeof val === 'object' ? String(val.cert || '').trim() : '';
+        const confirmer = typeof val === 'object' ? String(val.confirmer || '').trim() : '';
+        const prev = confirmedMap[badgeId] || {};
+        confirmedMap[badgeId] = {
+          date: date || prev.date || '',
+          confirmer: confirmer || prev.confirmer || '',
+          cert: cert || prev.cert || '',
+        };
+      }
     }
   }
 
-  if (!progressMap) {
-    throw new Error('找不到可識別的深資童軍進度資料（需要 progress / progress_mock 或 {項目ID: 日期}）');
+  // 相容頂層直接 { 'L1-ACT-01': '2026-10-01' }
+  if (!foundConfirmedContainer) {
+    const directEntries = Object.entries(json).filter(([k]) => Boolean(ITEM_INDEX[k]));
+    if (directEntries.length > 0) {
+      foundConfirmedContainer = true;
+      matchedBy = '直接已核實進度表';
+      for (const [itemId, val] of directEntries) {
+        if (!isConfirmedBadgeEntry(val)) {
+          skippedPending += 1;
+          continue;
+        }
+        const date = typeof val === 'string' ? val.trim() : String(val.date || '').trim();
+        const confirmer = typeof val === 'object' ? String(val.confirmer || val.assessor || '').trim() : '';
+        const cert = typeof val === 'object' ? String(val.cert || '').trim() : '';
+        confirmedMap[itemId] = { date, confirmer, cert };
+      }
+    }
+  }
+
+  if (!foundConfirmedContainer) {
+    throw new Error('找不到可識別的 vsbadge 領袖已核實進度資料');
   }
 
   const imported = [];
-  const skipped = [];
   next.progress = next.progress || {};
   next.pages = next.pages || {};
+  const now = new Date().toISOString();
 
-  Object.entries(progressMap).forEach(([itemId, value]) => {
-    if (!ITEM_INDEX[itemId]) {
-      skipped.push(itemId);
-      return;
-    }
-    const date = typeof value === 'string' ? value : value?.date || '';
-    if (!date) return;
-    if (next.progress[itemId]?.date) return; // 不覆蓋本機已有的日期與簽名
-    next.progress[itemId] = { date, source: 'vsbadge', at: new Date().toISOString() };
+  Object.entries(confirmedMap).forEach(([itemId, info]) => {
+    if (!info.date) return;
+    const prev = next.progress[itemId] || {};
+    // 無條件相信 vsbadge 內領袖已核實的資料（保留本機可能已有的手寫簽名圖片）
+    next.progress[itemId] = {
+      ...prev,
+      date: info.date,
+      assessor: info.confirmer || prev.assessor || 'vsbadge 領袖已核實',
+      ...(info.cert ? { cert: info.cert } : {}),
+      confirmedByBadge: true,
+      source: 'vsbadge',
+      at: now,
+    };
     imported.push(itemId);
 
-    // 同步常見特殊獎章至對應紙本頁
     if (itemId === 'OT-FA') {
-      next.pages.p34 = { ...(next.pages.p34 || {}), faCompletedDate: next.pages.p34?.faCompletedDate || date };
+      next.pages.p34 = {
+        ...(next.pages.p34 || {}),
+        faCompletedDate: info.date,
+        ...(info.cert ? { faCertNo: info.cert } : {}),
+      };
     } else if (itemId === 'OT-WORLD-SW-AWARD') {
-      next.pages.p34 = { ...(next.pages.p34 || {}), swaCompletedDate: next.pages.p34?.swaCompletedDate || date };
+      next.pages.p34 = {
+        ...(next.pages.p34 || {}),
+        swaCompletedDate: info.date,
+        ...(info.cert ? { swaCertNo: info.cert } : {}),
+      };
     } else if (itemId === 'OT-ROVER-LINK') {
-      next.pages.p35 = { ...(next.pages.p35 || {}), completedDate: next.pages.p35?.completedDate || date };
+      next.pages.p35 = {
+        ...(next.pages.p35 || {}),
+        completedDate: info.date,
+        ...(info.cert ? { certNo: info.cert } : {}),
+      };
     }
   });
 
-  const srcMember = Array.isArray(json.members)
-    ? json.members.find((m) => String(m.scoutId || m.ymis) === scoutId(member)) || json.members[0]
-    : null;
-  if (srcMember) {
-    const sid = srcMember.scoutId || srcMember.ymis;
-    if (!scoutId(member) && sid && sid !== 'UNSET') member.scoutId = String(sid);
-    if (!member.nameZh && srcMember.name) member.nameZh = srcMember.name;
-    if (!member.nameEn && srcMember.nameEn) member.nameEn = srcMember.nameEn;
-    if (!member.dateJoined && srcMember.joinDate) member.dateJoined = srcMember.joinDate;
-    if (!member.unit && (srcMember.unit || srcMember.crew)) member.unit = srcMember.unit || srcMember.crew;
-    if (!member.group && srcMember.group) member.group = srcMember.group;
-  }
-  syncIdentity(member);
-  next.member = member;
-  next.meta = { ...(next.meta || {}), updatedAt: new Date().toISOString() };
+  // 嚴守「不錄入個人資料，只錄入進度」：絕不從 json.members 複製姓名、旅團、電郵等任何個人資料
+  next.meta = { ...(next.meta || {}), updatedAt: now };
 
-  return { book: next, imported: imported.length, skipped, matchedBy };
+  return {
+    book: next,
+    imported: imported.length,
+    skippedPending,
+    matchedBy: matchedBy || (mySid ? `SCOUT ID ${mySid}` : '已核實進度'),
+  };
 }
 
 export function progressedCount(book) {

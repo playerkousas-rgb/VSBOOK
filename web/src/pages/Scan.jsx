@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import jsQR from 'jsqr';
-import { mergeMemberPayloadIntoRoster } from '@shared/book.js';
 import {
   KIND_MEMBER,
   KIND_SIGNOFF,
@@ -10,7 +9,6 @@ import {
 } from '@shared/transfer.js';
 import { syllabusItem } from '@shared/forms.js';
 import { useBook } from '../bookContext.js';
-import LeaderBatchPanel, { readLeaderRoster, writeLeaderRoster } from '../components/LeaderBatchPanel.jsx';
 import SignoffPanel from '../components/SignoffPanel.jsx';
 import { Crest, Icon, useToast } from '../ui.jsx';
 import { Link, navigate } from '../router.jsx';
@@ -18,11 +16,11 @@ import { useLang } from '../i18n.jsx';
 import { exitLeaderMode } from '../leader.js';
 import { LegalNote } from '../components/Legal.jsx';
 
-export const SCAN_MEMBER_KEY = 'vsbook.scan.member.v1';
-export const SCAN_SIGNOFF_KEY = 'vsbook.scan.signoff.v1';
+const SCAN_MEMBER_KEY = 'vsbook.scan.member.v1';
+const SCAN_SIGNOFF_KEY = 'vsbook.scan.signoff.v1';
 const APPLIED_KEY = 'vsbook.signoff.applied.v1';
 
-export const saveSession = (key, data) => {
+const saveSession = (key, data) => {
   try {
     window.sessionStorage.setItem(key, JSON.stringify(data));
   } catch {
@@ -39,59 +37,28 @@ const readSession = (key) => {
 };
 
 /* ============================================================
-   領袖模式工作台：單人掃描查閱 + vsbadge 全團進度與一簽簽發 (/scan, /scan/batch)
+   相機／貼上掃描器 (/scan) —— 領袖當面唯讀查閱單一成員紀錄冊並簽署回傳碼
    ============================================================ */
 
-export function Scan({ hasBook = true, initialTab = 'scan' }) {
+export function Scan({ hasBook = true }) {
   const { isEn } = useLang();
-  const { push } = useToast();
-  const [tab, setTab] = useState(initialTab);
-  const [batchCollect, setBatchCollect] = useState(false);
-  const [rosterCount, setRosterCount] = useState(() => readLeaderRoster().length);
   const videoRef = useRef(null);
-  const lastRawRef = useRef('');
   const [status, setStatus] = useState('starting');
   const [error, setError] = useState('');
   const [showManual, setShowManual] = useState(false);
   const [manual, setManual] = useState('');
 
-  useEffect(() => {
-    setTab(initialTab);
-  }, [initialTab]);
-
-  useEffect(() => {
-    setRosterCount(readLeaderRoster().length);
-  }, [tab]);
-
   const routePayload = (payload) => {
     if (payload.t === KIND_SIGNOFF) {
       saveSession(SCAN_SIGNOFF_KEY, payload);
       navigate('/scan/signoff');
-      return;
-    }
-    if (payload.t === KIND_MEMBER) {
-      if (batchCollect) {
-        try {
-          const { roster, scoutId } = mergeMemberPayloadIntoRoster(readLeaderRoster(), payload);
-          writeLeaderRoster(roster);
-          setRosterCount(roster.length);
-          push(
-            isEn
-              ? `Added ${scoutId} to batch roster (${roster.length} total, progress only)`
-              : `已加入 ${scoutId} 純進度至全團名單（現共 ${roster.length} 人）`,
-          );
-        } catch (err) {
-          setError(err.message || (isEn ? 'Unable to add member progress' : '無法加入成員進度'));
-        }
-        return;
-      }
+    } else if (payload.t === KIND_MEMBER) {
       saveSession(SCAN_MEMBER_KEY, payload);
       navigate('/scan/view');
     }
   };
 
   useEffect(() => {
-    if (tab !== 'scan') return undefined;
     let stream = null;
     let raf = 0;
     let stopped = false;
@@ -127,18 +94,11 @@ export function Scan({ hasBook = true, initialTab = 'scan' }) {
             const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
             if (code?.data) raw = code.data;
           }
-          if (raw && raw !== lastRawRef.current) {
-            lastRawRef.current = raw;
+          if (raw) {
             const payload = await decodePayload(raw);
-            if (!batchCollect) {
-              stop();
-              routePayload(payload);
-              return;
-            }
+            stop();
             routePayload(payload);
-            setTimeout(() => {
-              lastRawRef.current = '';
-            }, 1800);
+            return;
           }
         } catch (err) {
           if (err?.message?.includes('VSBOOK')) setError(err.message);
@@ -185,12 +145,7 @@ export function Scan({ hasBook = true, initialTab = 'scan' }) {
     })();
 
     return stop;
-  }, [isEn, tab, batchCollect]);
-
-  const switchTab = (nextTab) => {
-    setTab(nextTab);
-    navigate(nextTab === 'batch' ? '/scan/batch' : '/scan', { replace: true });
-  };
+  }, [isEn]);
 
   return (
     <div className="scanpage">
@@ -202,23 +157,11 @@ export function Scan({ hasBook = true, initialTab = 'scan' }) {
           <span className="eyebrow">
             {isEn ? 'LEADER MODE · READ-ONLY' : '領袖只讀模式 · 不修改本機紀錄冊'}
           </span>
-          <h1>
-            {tab === 'batch'
-              ? isEn
-                ? 'All-Members Progress & One-Sign Batch Sign-off'
-                : '全團成員進度總覽 · 一簽簽發所有成員'
-              : isEn
-                ? 'Scan Member Record Book (Read-Only)'
-                : '掃描成員紀錄冊（只讀檢視及核簽）'}
-          </h1>
+          <h1>{isEn ? 'Scan Member Record Book (Read-Only)' : '掃描成員紀錄冊（只讀檢視及當面核簽）'}</h1>
           <p>
-            {tab === 'batch'
-              ? isEn
-                ? 'Cooperates with vsbadge backend: view all members’ progress at once and sign once for all selected members (progress only, zero personal particulars).'
-                : '配合兄弟系統 vsbadge 後端：一次過檢視全團進度，簽名一次即可簽發所有已選成員（只錄入進度，不錄入個人資料）。'
-              : isEn
-                ? 'Inspect shared sections in read-only mode without modifying the member’s device, or collect progress into the batch roster.'
-                : '領袖模式為只讀狀態：對準成員出示的二維碼即可唯讀查閱，核對後可單人核簽或加入全團名單一簽簽發。'}
+            {isEn
+              ? 'Leader Mode is strictly read-only: inspect a member’s shared book sections face-to-face and issue a signed Return QR.'
+              : '領袖模式為只讀狀態：對準成員出示的二維碼即可唯讀查閱已分享內容，核對後可當面簽發核簽回傳碼。'}
           </p>
         </div>
         <button
@@ -233,137 +176,75 @@ export function Scan({ hasBook = true, initialTab = 'scan' }) {
         </button>
       </header>
 
-      <nav className="leader-modetabs" aria-label={isEn ? 'Leader workbench mode' : '領袖工作台切換'}>
-        <button
-          type="button"
-          className={`leader-modetab${tab === 'batch' ? ' is-on' : ''}`}
-          onClick={() => switchTab('batch')}
-        >
-          <Icon name="seal" size={15} />{' '}
-          <span>
-            {isEn
-              ? `All-Members & One-Sign (vsbadge${rosterCount ? ` · ${rosterCount}` : ''})`
-              : `全團進度 · 一簽簽發（vsbadge${rosterCount ? ` · ${rosterCount} 人` : ''}）`}
-          </span>
-        </button>
-        <button
-          type="button"
-          className={`leader-modetab${tab === 'scan' ? ' is-on' : ''}`}
-          onClick={() => switchTab('scan')}
-        >
-          <Icon name="qr" size={15} />{' '}
-          <span>{isEn ? 'Scan Member QR' : '掃描成員二維碼'}</span>
-        </button>
-      </nav>
+      <div className={`scanner scanner--${status}`}>
+        <video ref={videoRef} className="scanner__video" playsInline muted autoPlay />
+        <div className="scanner__frame" aria-hidden="true">
+          <i />
+          <i />
+          <i />
+          <i />
+        </div>
+        {status === 'starting' && (
+          <div className="scanner__overlay">
+            <Crest size={34} />
+            <p>{isEn ? 'Starting camera…' : '正在啟動相機鏡頭…'}</p>
+          </div>
+        )}
+        {status === 'blocked' && (
+          <div className="scanner__overlay scanner__overlay--error">
+            <Icon name="camera" size={26} />
+            <p>{error}</p>
+          </div>
+        )}
+      </div>
 
-      {tab === 'batch' ? (
-        <LeaderBatchPanel onSwitchToScanner={() => switchTab('scan')} />
-      ) : (
-        <>
-          <label className="scancollect">
-            <input
-              type="checkbox"
-              checked={batchCollect}
-              onChange={(e) => setBatchCollect(e.target.checked)}
+      <div className="scanactions">
+        <button
+          type="button"
+          className="btn btn--ghost"
+          onClick={() => {
+            setShowManual((v) => !v);
+            setError('');
+          }}
+        >
+          <Icon name="copy" size={15} /> {isEn ? 'Paste VS1 Code / Link' : '手動貼上代碼或連結'}
+        </button>
+        {hasBook && (
+          <Link to="/forms" className="btn btn--ghost">
+            <Icon name="file" size={15} /> {isEn ? 'Official Forms' : '官方申請表'}
+          </Link>
+        )}
+      </div>
+
+      {showManual && (
+        <div className="scanmanual">
+          <label>
+            <span>{isEn ? 'Paste VS1... code or #v=VS1... link:' : '請貼上以 VS1. 開頭的二維碼內容或唯讀連結：'}</span>
+            <textarea
+              rows={4}
+              value={manual}
+              onChange={(e) => setManual(e.target.value)}
+              placeholder="VS1.H4sIAAAAAAAA..."
             />
-            <span>
-              <strong>
-                {isEn
-                  ? 'Continuous Batch Mode (Progress Only)'
-                  : '連續掃描加入全團核簽名單（只取進度，不錄入個人資料）'}
-              </strong>
-              <small>
-                {isEn
-                  ? 'Keep camera open to scan multiple members into the One-Sign roster.'
-                  : '勾選後可連續掃描多位成員二維碼，完成後按上方「全團進度 · 一簽簽發」一次簽名簽發。'}
-              </small>
-            </span>
-            {rosterCount > 0 && (
-              <button
-                type="button"
-                className="btn btn--gold btn--sm"
-                onClick={(e) => {
-                  e.preventDefault();
-                  switchTab('batch');
-                }}
-              >
-                {isEn ? `Open Roster (${rosterCount})` : `前往一簽簽發（${rosterCount} 人）`}
-              </button>
-            )}
           </label>
-
-          <div className={`scanner scanner--${status}`}>
-            <video ref={videoRef} className="scanner__video" playsInline muted autoPlay />
-            <div className="scanner__frame" aria-hidden="true">
-              <i />
-              <i />
-              <i />
-              <i />
-            </div>
-            {status === 'starting' && (
-              <div className="scanner__overlay">
-                <Crest size={34} />
-                <p>{isEn ? 'Starting camera…' : '正在啟動相機鏡頭…'}</p>
-              </div>
-            )}
-            {status === 'blocked' && (
-              <div className="scanner__overlay scanner__overlay--error">
-                <Icon name="camera" size={26} />
-                <p>{error}</p>
-              </div>
-            )}
-          </div>
-
-          <div className="scanactions">
-            <button
-              type="button"
-              className="btn btn--ghost"
-              onClick={() => {
-                setShowManual((v) => !v);
-                setError('');
-              }}
-            >
-              <Icon name="copy" size={15} /> {isEn ? 'Paste VS1 Code / Link' : '手動貼上代碼或連結'}
-            </button>
-            {hasBook && (
-              <Link to="/forms" className="btn btn--ghost">
-                <Icon name="file" size={15} /> {isEn ? 'Official Forms' : '官方申請表'}
-              </Link>
-            )}
-          </div>
-
-          {showManual && (
-            <div className="scanmanual">
-              <label>
-                <span>{isEn ? 'Paste VS1... code or #v=VS1... link:' : '請貼上以 VS1. 開頭的二維碼內容或唯讀連結：'}</span>
-                <textarea
-                  rows={4}
-                  value={manual}
-                  onChange={(e) => setManual(e.target.value)}
-                  placeholder="VS1.H4sIAAAAAAAA..."
-                />
-              </label>
-              <button
-                type="button"
-                className="btn btn--primary"
-                onClick={async () => {
-                  try {
-                    const payload = await decodePayload(manual);
-                    if (batchCollect && payload.t === KIND_MEMBER) setManual('');
-                    routePayload(payload);
-                  } catch (e) {
-                    setError(e.message || (isEn ? 'Unable to decode content' : '未能解讀內容'));
-                  }
-                }}
-              >
-                <Icon name="check" size={15} /> {isEn ? 'Decode & Open' : '解碼並開啟'}
-              </button>
-            </div>
-          )}
-
-          {error && status !== 'blocked' && <p className="form-error">{error}</p>}
-        </>
+          <button
+            type="button"
+            className="btn btn--primary"
+            onClick={async () => {
+              try {
+                const payload = await decodePayload(manual);
+                routePayload(payload);
+              } catch (e) {
+                setError(e.message || (isEn ? 'Unable to decode content' : '未能解讀內容'));
+              }
+            }}
+          >
+            <Icon name="check" size={15} /> {isEn ? 'Decode & Open' : '解碼並開啟'}
+          </button>
+        </div>
       )}
+
+      {error && status !== 'blocked' && <p className="form-error">{error}</p>}
     </div>
   );
 }
@@ -374,28 +255,12 @@ export function Scan({ hasBook = true, initialTab = 'scan' }) {
 
 export function MemberPayloadView({ payload, withSignoff = false, onCloseHref = '/scan' }) {
   const { isEn } = useLang();
-  const { push } = useToast();
   const received = TRANSFER_OPTIONS.filter((o) => (payload.sel || []).includes(o.key));
   const m = payload.member || {};
   const c = payload.contact || {};
   const sid = m.scoutId || m.memberNo || payload.scoutId || '';
   const progressEntries = Object.entries(payload.progress || {});
   const summaries = Object.entries(payload.summaries || {});
-
-  const addToBatchRoster = () => {
-    try {
-      const { roster, scoutId } = mergeMemberPayloadIntoRoster(readLeaderRoster(), payload);
-      writeLeaderRoster(roster);
-      push(
-        isEn
-          ? `Added ${scoutId} to batch roster (${roster.length} members, progress only)`
-          : `已將 ${scoutId} 純進度加入全團核簽名單（共 ${roster.length} 人）`,
-      );
-      navigate('/scan/batch');
-    } catch (err) {
-      push(err.message || (isEn ? 'Cannot add to batch roster' : '無法加入全團名單'), 'error');
-    }
-  };
 
   return (
     <div className="scanview">
@@ -407,12 +272,6 @@ export function MemberPayloadView({ payload, withSignoff = false, onCloseHref = 
           {m.nameZh || m.nameEn || (sid ? `#${sid}` : isEn ? 'Venture Scout Member' : '深資童軍成員')} ·{' '}
           {isEn ? `${received.length} sections (Read-Only)` : `只讀檢視 · 今次分享了 ${received.length} 組資料`}
         </span>
-        {sid && (
-          <button type="button" className="btn btn--gold btn--sm" onClick={addToBatchRoster}>
-            <Icon name="seal" size={13} />{' '}
-            {isEn ? 'Add to One-Sign Roster' : '加入全團一簽名單'}
-          </button>
-        )}
       </div>
 
       <div className="scanview__tags">
@@ -537,7 +396,7 @@ export function ScanView() {
 }
 
 /* ============================================================
-   成員接收領袖核簽回傳碼 (/scan/signoff)
+   成員接收領袖當面核簽回傳碼 (/scan/signoff)
    ============================================================ */
 
 export function Signoff() {
@@ -574,7 +433,6 @@ export function Signoff() {
   }
 
   const already = appliedList.includes(payload.seq);
-  const isBatch = Boolean(payload.batch && Array.isArray(payload.targets));
   const rows = (payload.items || []).map((item) => {
     const cur = book.progress?.[item.id] || {};
     const it = syllabusItem(item.id);
@@ -612,13 +470,7 @@ export function Signoff() {
         </Link>
         <div>
           <span className="eyebrow">
-            {isBatch
-              ? isEn
-                ? `ONE-SIGN BATCH SLIP · ${payload.targets.length} MEMBERS`
-                : `領袖一簽通用核簽單 · 涵蓋 ${payload.targets.length} 位成員`
-              : isEn
-                ? 'LEADER SIGN-OFF SLIP'
-                : '領袖核簽回傳單'}
+            {isEn ? 'LEADER SIGN-OFF SLIP' : '領袖當面核簽回傳單'}
           </span>
           <h1>
             {payload.leader?.name || (isEn ? 'Leader' : '領袖')} · {rows.length} {isEn ? 'items' : '項核簽'}
@@ -630,7 +482,7 @@ export function Signoff() {
                 : '這張核簽單之前已經寫入過你的紀錄冊。'
               : isEn
                 ? 'Confirm below to write these signatures and dates into your local record book.'
-                : '確認無誤後按下方按鈕，即可將領袖簽名與完成日期寫入你的本機紀錄冊。'}
+                : '確認無誤後按下方按鈕，即可將領袖簽名寫入你的本機紀錄冊。'}
           </p>
         </div>
       </header>

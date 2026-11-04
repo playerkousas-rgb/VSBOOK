@@ -48,14 +48,14 @@ export default function MenuDialog({ open, onClose, onShowQr, leader = false, le
     reader.onload = () => {
       try {
         const data = JSON.parse(String(reader.result));
-        const draft = structuredClone(book);
-        const result = importFromVsBadge(data, draft);
-        draft.member = result.member;
-        replace(newBook(draft));
+        const result = importFromVsBadge(data, book);
+        replace(result.book);
         push(
           isEn
-            ? `Imported ${result.imported} items from vsbadge (${result.matchedBy})`
-            : `已從 vsbadge 匯入 ${result.imported} 項進度（${result.matchedBy}）`,
+            ? `Imported ${result.imported} leader-confirmed items (${result.matchedBy})`
+            : `已從 vsbadge 錄入 ${result.imported} 項領袖已核實進度${
+                result.skippedPending ? `（已略過 ${result.skippedPending} 項未核實項目）` : ''
+              }`,
         );
         navigate('/p/p09');
         onClose();
@@ -111,48 +111,24 @@ export default function MenuDialog({ open, onClose, onShowQr, leader = false, le
         )}
 
         {leader ? (
-          <>
-            <button
-              type="button"
-              className="menu__item menu__item--accent"
-              onClick={() => {
-                onClose();
-                navigate('/scan/batch');
-              }}
-            >
-              <Icon name="seal" size={18} />
-              <span>
-                <strong>
-                  {isEn
-                    ? 'All-Members Progress & One-Sign (vsbadge)'
-                    : '全團進度總覽 · 一簽簽發所有成員（vsbadge）'}
-                </strong>
-                <em>
-                  {isEn
-                    ? 'Inspect all members’ progress at once and sign once to issue sign-offs (progress only, zero personal data)'
-                    : '配合 vsbadge 後端一次看全團進度，簽名一次簽發全體成員（只錄入進度，不錄入個人資料）'}
-                </em>
-              </span>
-            </button>
-            <button
-              type="button"
-              className="menu__item"
-              onClick={() => {
-                onClose();
-                navigate('/scan');
-              }}
-            >
-              <Icon name="qr" size={18} />
-              <span>
-                <strong>{isEn ? 'Scan Member QR Code (Leader · Read-Only)' : '掃描成員二維碼（領袖 · 只讀檢視）'}</strong>
-                <em>
-                  {isEn
-                    ? 'Read a member’s shared book in read-only mode and sign items off'
-                    : '唯讀查閱成員出示的紀錄冊內容，核對後可簽署回傳碼'}
-                </em>
-              </span>
-            </button>
-          </>
+          <button
+            type="button"
+            className="menu__item menu__item--accent"
+            onClick={() => {
+              onClose();
+              navigate('/scan');
+            }}
+          >
+            <Icon name="qr" size={18} />
+            <span>
+              <strong>{isEn ? 'Scan Member QR Code (Leader · Read-Only)' : '掃描二維碼（領袖 · 只讀檢視）'}</strong>
+              <em>
+                {isEn
+                  ? 'Read a member’s shared book in read-only mode and sign items off'
+                  : '唯讀查閱成員出示的紀錄冊內容，核對後可簽署回傳碼'}
+              </em>
+            </span>
+          </button>
         ) : null}
 
         <button type="button" className="menu__item" onClick={() => onShowQr?.()}>
@@ -260,11 +236,22 @@ export default function MenuDialog({ open, onClose, onShowQr, leader = false, le
               </span>
             </button>
 
-            <button type="button" className="menu__item" onClick={() => vsRef.current?.click()}>
+            <button
+              type="button"
+              className="menu__item"
+              onClick={() => {
+                onClose();
+                navigate('/p/appendix');
+              }}
+            >
               <Icon name="link" size={18} />
               <span>
-                <strong>{isEn ? 'Import Progress from vsbadge' : '從 vsbadge 匯入進度'}</strong>
-                <em>{isEn ? 'Read vsbadge members / progress JSON' : '讀取 vsbadge 進度 JSON'}</em>
+                <strong>{isEn ? 'Sync Progress with vsbadge' : '與 vsbadge 同步個人進度'}</strong>
+                <em>
+                  {isEn
+                    ? 'Pull leader-confirmed progress into BOOK, or submit BOOK progress as Pending'
+                    : '錄入 vsbadge 內領袖已核實進度，或將 BOOK 進度送交待領袖核實'}
+                  </em>
               </span>
             </button>
           </>

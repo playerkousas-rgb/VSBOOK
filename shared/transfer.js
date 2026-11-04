@@ -254,23 +254,16 @@ export async function encodeTransfer(book, selection) {
   return encodePayload(buildPayload(book, selection));
 }
 
-export async function encodeSignoff({ member, leader, items, note, targets }) {
-  const cleanTargets = Array.isArray(targets)
-    ? [...new Set(targets.map(normalizeScoutId).filter(Boolean))]
-    : [];
+export async function encodeSignoff({ member, leader, items, note }) {
   const payload = {
     t: KIND_SIGNOFF,
     v: TRANSFER_VERSION,
     at: new Date().toISOString(),
     seq: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
-    ...(cleanTargets.length > 0
-      ? { batch: true, targets: cleanTargets }
-      : {
-          member: {
-            nameZh: member?.nameZh || '',
-            scoutId: member?.scoutId || member?.memberNo || '',
-          },
-        }),
+    member: {
+      nameZh: member?.nameZh || '',
+      scoutId: member?.scoutId || member?.memberNo || '',
+    },
     leader: {
       name: leader?.name || '',
       title: leader?.title || '深資童軍團長 VSL',
@@ -286,15 +279,6 @@ export async function encodeSignoff({ member, leader, items, note, targets }) {
     note: note || '',
   };
   return encodePayload(payload);
-}
-
-/**
- * 一簽簽發所有成員：只把各成員 SCOUT ID、領袖簽名與完成項目編入單一通用回傳二維碼，絕不寫入任何個人資料。
- */
-export async function encodeBatchSignoff({ targets = [], leader, items = [], note = 'VSBOOK 領袖一簽簽發' }) {
-  const cleanTargets = [...new Set((targets || []).map(normalizeScoutId).filter(Boolean))];
-  if (!cleanTargets.length) throw new Error('請至少揀選一位成員（SCOUT ID）');
-  return encodeSignoff({ targets: cleanTargets, leader, items, note });
 }
 
 /** 抽取純 VS1 字串（同時支援直接掃描 VS1... 或貼上含 #v=VS1... 的完整網址）。 */
@@ -336,16 +320,7 @@ export async function decodeTransfer(rawInput) {
 
 export function applySignoff(book, payload) {
   if (!payload || payload.t !== KIND_SIGNOFF) throw new Error('這不是有效的領袖核簽單');
-  if (Array.isArray(payload.targets) && payload.targets.length > 0) {
-    const myId = normalizeScoutId(book?.member?.scoutId || book?.member?.memberNo);
-    if (!myId) {
-      throw new Error('請先在第 1 頁填寫你的童軍成員編號（SCOUT ID），再寫入領袖批量核簽單');
-    }
-    const matched = payload.targets.some((tid) => sameScoutId(tid, myId));
-    if (!matched) {
-      throw new Error(`此批量核簽單未包含你的 SCOUT ID（${myId}），請向領袖確認`);
-    }
-  } else if (payload?.member?.scoutId) {
+  if (payload?.member?.scoutId) {
     const myId = normalizeScoutId(book?.member?.scoutId || book?.member?.memberNo);
     if (myId && !sameScoutId(payload.member.scoutId, myId)) {
       throw new Error(`此核簽單屬於 SCOUT ID ${payload.member.scoutId}，與本機（${myId}）不符`);
