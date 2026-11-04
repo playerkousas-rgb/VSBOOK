@@ -5,8 +5,8 @@ import { useLang } from '../i18n.jsx';
 import { LegalLine } from '../components/Legal.jsx';
 
 /**
- * 全幅深資童軍酒紅布面燙金封面（對齊 ROVERBOOK v16 .coverart 結構，中英完全分開）：
- * 全書唯一一行非官方版權細字置於封面最底（附錄及選單「關於」保留完整版）。
+ * 全屏深資童軍酒紅布面燙金封面（1:1 對齊 ROVERBOOK CoverPage）：
+ * 整個螢幕就是紀錄冊封面（The whole screen is the cover）。
  */
 export default function CoverPage({ book, onOpen, last, onContinue, onLeader }) {
   const { isEn } = useLang();
@@ -38,14 +38,13 @@ export default function CoverPage({ book, onOpen, last, onContinue, onLeader }) 
       <span className="coverart__spine" aria-hidden="true" />
 
       <div className="coverart__top">
-        <Crest size={56} />
+        <Crest size={58} />
         <div>
           <strong>{isEn ? 'SCOUT ASSOCIATION OF HONG KONG' : '香港童軍總會'}</strong>
         </div>
       </div>
 
       <div className="coverart__center">
-        <img className="coverart__emblem" src="/img/crest-venture.png" alt="" aria-hidden="true" />
         {isEn ? (
           <>
             <span className="coverart__kicker">VENTURE SCOUT SECTION</span>
@@ -54,6 +53,7 @@ export default function CoverPage({ book, onOpen, last, onContinue, onLeader }) 
           </>
         ) : (
           <>
+            <span className="coverart__kicker">VENTURE SCOUT</span>
             <h1 className="coverart__title">深資童軍</h1>
             <h2 className="coverart__subtitle">紀　錄　冊</h2>
           </>

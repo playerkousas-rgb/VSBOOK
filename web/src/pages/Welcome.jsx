@@ -75,7 +75,6 @@ export default function Welcome({ onReady, onLeader }) {
             </div>
           </div>
           <div className="coverart__center">
-            <img className="coverart__emblem" src="/img/crest-venture.png" alt="" aria-hidden="true" />
             {isEn ? (
               <>
                 <span className="coverart__kicker">VENTURE SCOUT SECTION</span>
@@ -84,6 +83,7 @@ export default function Welcome({ onReady, onLeader }) {
               </>
             ) : (
               <>
+                <span className="coverart__kicker">VENTURE SCOUT</span>
                 <h1 className="coverart__title">深資童軍</h1>
                 <h2 className="coverart__subtitle">紀　錄　冊</h2>
               </>

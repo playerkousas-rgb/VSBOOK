@@ -37,107 +37,86 @@ const TOC_GROUPS = [
   },
 ];
 
-/* ------------------------------------------------------------ 數位目錄頁（對齊 ROVERBOOK Contents） */
+/* ------------------------------------------------------------ 數位目錄頁（1:1 對齊 ROVERBOOK Contents 扉頁排版） */
 export function ContentsPage() {
   const { book } = useBook();
   const { isEn } = useLang();
   const stats = allStats(book);
+  const byId = Object.fromEntries(SECTIONS.map((s) => [s.id, s]));
+  const latestRenewal = (book.renewals || []).filter((r) => r?.validUntil).sort((a, b) => b.validUntil.localeCompare(a.validUntil))[0];
 
   return (
     <Page id="contents" className="p-contents">
-      <div className="tocintro">
-        <div>
-          <span className="tocintro__kicker">{isEn ? 'HOW THIS BOOK WORKS' : '使用說明'}</span>
-          <h2>
-            {isEn
-              ? 'Page numbers match the paper record book; tap any line to fill.'
-              : '頁碼與紙本一致；點一下橫線就可以寫字。'}
-          </h2>
-          <p>
-            {isEn
-              ? '1–40 follow the printed Venture Scout Record Book (11th Edition Syllabus). Everything stays on this device; tap “Show QR” in the top bar to share selected sections with your leader.'
-              : '第 1–40 頁完全依香港童軍總會《深資童軍紀錄冊》（第十一版訓練綱要）編排。所有內容儲存在本機；要給領袖過目或簽名時，按右上角「出示 QR」即可逐項選擇要傳送的內容。'}
-          </p>
-        </div>
-
-        <div className="tocring">
-          <svg viewBox="0 0 88 88" width="84" height="84" aria-hidden="true">
-            <circle cx="44" cy="44" r="37" className="tocring__bg" />
-            <circle
-              cx="44"
-              cy="44"
-              r="37"
-              className="tocring__fg"
-              strokeDasharray={`${Math.round((stats.percent / 100) * 232.5)} 232.5`}
-            />
-          </svg>
-          <div className="tocring__txt">
-            <strong>{stats.percent}%</strong>
+      <div className="tocpage">
+        <div className="tocpage__progress">
+          <div className="tocring-ring" style={{ '--p': `${stats.percent}%` }}>
+            <span>{stats.percent}%</span>
+          </div>
+          <div className="tocpage__progress-text">
+            <strong>
+              {isEn ? `${stats.done} / ${stats.total} items done` : `${stats.done} / ${stats.total} 項已完成`}
+            </strong>
             <span>
-              {stats.done}/{stats.total}
+              {stats.nextBadge?.badge?.name
+                ? isEn
+                  ? `Next: ${stats.nextBadge.badge.en || stats.nextBadge.badge.name} · ${stats.nextBadge.done}/${stats.nextBadge.total}`
+                  : `下一枚：${stats.nextBadge.badge.name} · ${stats.nextBadge.done}/${stats.nextBadge.total}`
+                : isEn
+                  ? 'All complete'
+                  : '全部完成'}
             </span>
           </div>
         </div>
-      </div>
 
-      <div className="tocbadges">
-        {stats.badges.map(({ badge, done, total, percent, awarded }) => (
-          <div key={badge.id} className={cx('tocbadge', (percent === 100 || awarded) && 'is-done')}>
-            <div className="tocbadge__top">
-              <strong>{isEn ? badge.en : badge.name}</strong>
-              <span>
-                {done}/{total}
-              </span>
-            </div>
-            <div className="tocbadge__bar">
-              <i style={{ width: `${percent}%` }} />
-            </div>
-            {awarded && (
-              <small>
-                {isEn ? 'Completed ' : '已完成 · '}
-                {awarded}
-              </small>
-            )}
+        <p className="tocpage__intro">
+          {isEn
+            ? 'This digital edition follows the Venture Scout Record Book (11th Edition Syllabus) page by page, pages 1–40. Tap any line to write; text scales automatically to fit.'
+            : '本電子版逐頁對應《深資童軍紀錄冊》（第十一版訓練綱要）第 1–40 頁。每一頁都可以直接點擊填寫，字體會自動縮放。'}
+        </p>
+
+        <div className="tocpage__cols">
+          {TOC_GROUPS.map((g) => (
+            <section key={g.title} className="tocsec">
+              <h4>{isEn ? g.en : g.title}</h4>
+              <ul>
+                {g.ids.map((id) => {
+                  const s = byId[id];
+                  if (!s) return null;
+                  return (
+                    <li key={s.id}>
+                      <Link to={`/p/${s.id}`}>
+                        <span className="tocsec__no">{s.page === '—' ? (isEn ? 'App.' : '附錄') : s.page}</span>
+                        <span className="tocsec__label">{isEn ? s.en || s.label : s.label}</span>
+                        <Icon name="chevron" size={11} />
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ))}
+        </div>
+
+        <div className="tocsummary">
+          <div>
+            <span>{isEn ? `${stats.done} / ${stats.total} training items` : `${stats.done} / ${stats.total} 項訓練細項`}</span>
+            <strong>{stats.percent}%</strong>
           </div>
-        ))}
-      </div>
-
-      <div className="tocgroups">
-        {TOC_GROUPS.map((g) => (
-          <section key={g.title} className="tocgroup">
-            <header>
-              <h3>{isEn ? g.en : g.title}</h3>
-              {!isEn && <span>{g.en}</span>}
-            </header>
-            <ol>
-              {g.ids.map((id) => {
-                const s = SECTIONS.find((x) => x.id === id);
-                if (!s) return null;
-                return (
-                  <li key={s.id}>
-                    <Link to={`/p/${s.id}`} className="tocline">
-                      <span className="tocline__title">
-                        {isEn ? s.en || s.label : s.label}
-                        {!isEn && s.en && <em>{s.en}</em>}
-                      </span>
-                      <span className="tocline__dots" aria-hidden="true" />
-                      <span className="tocline__no">{s.page === '—' ? (isEn ? 'App.' : '附錄') : s.page}</span>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ol>
-          </section>
-        ))}
-      </div>
-
-      <div className="tocfooter">
-        <Link to="/p/p01" className="btn btn--primary">
-          {isEn ? 'Start from Page 1' : '從第 1 頁開始填寫'} <Icon name="chevron" size={14} />
-        </Link>
-        <Link to="/forms" className="btn btn--ghost">
-          <Icon name="seal" size={14} /> {isEn ? '3 Official Forms (PT/65 · 19 · 20)' : '三張官方表格（PT/65・19・20）'}
-        </Link>
+          <div>
+            <span>{isEn ? 'Membership valid until' : '會籍有效至'}</span>
+            <strong>{latestRenewal?.validUntil || (isEn ? 'Not renewed' : '未續期')}</strong>
+          </div>
+          <div>
+            <span>{isEn ? 'Official forms' : '官方申請表'}</span>
+            <Link to="/forms" className="tocsummary__formlink">
+              PT/65 · 19 · 20 <Icon name="chevron" size={11} />
+            </Link>
+          </div>
+          <Link to="/p/appendix" className="tocsummary__full">
+            {isEn ? 'Digital appendix: backup · vsbadge sync · print' : '數位附錄：備份 · vsbadge 互通 · 列印'}{' '}
+            <Icon name="chevron" size={12} />
+          </Link>
+        </div>
       </div>
     </Page>
   );
