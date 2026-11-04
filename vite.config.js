@@ -3,12 +3,16 @@ import react from '@vitejs/plugin-react';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import vsbadgeHandler from './api/vsbadge.js';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 
-/** 本機開發／預覽提供與 Vercel `api/leader.js` 相同的 `/api/leader` 接口（預設測試密碼 1234） */
+/** 本機開發／預覽提供與 Vercel `api/leader.js` 及 `api/vsbadge.js` 相同的伺服器端接口 */
 function leaderDevPlugin() {
   const attach = (middlewares) => {
+    middlewares.use('/api/vsbadge', (req, res) => {
+      vsbadgeHandler(req, res);
+    });
     middlewares.use('/api/leader', (req, res) => {
       const expected = String(process.env.LEADER_CODE || '1234').trim();
       res.setHeader('Cache-Control', 'no-store');

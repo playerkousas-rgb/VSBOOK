@@ -21,6 +21,38 @@ export function scoutId(bookOrMember) {
   return String(m.scoutId || m.memberNo || m.ymis || '').trim();
 }
 
+/** 正規化 SCOUT ID／YMIS（去除空白；純數字可與 vsbadge 10 位 YMIS 互相比對）。 */
+export function normalizeScoutId(raw) {
+  return String(raw ?? '').trim().replace(/\s+/g, '');
+}
+
+/** 比對兩個 SCOUT ID／YMIS 是否同一成員（相容純數字補零至 10 位）。 */
+export function sameScoutId(a, b) {
+  const x = normalizeScoutId(a);
+  const y = normalizeScoutId(b);
+  if (!x || !y) return false;
+  if (x.toLowerCase() === y.toLowerCase()) return true;
+  if (/^\d+$/.test(x) && /^\d+$/.test(y)) {
+    return x.padStart(10, '0') === y.padStart(10, '0');
+  }
+  return false;
+}
+
+/** 可供領袖「一簽簽發」與 vsbadge 互通的全部訓練細項（L1–L4 葉節點＋OT 其他獎章）。 */
+export const SIGNABLE_ITEMS = [
+  ...SYLLABUS_ITEMS.filter((it) => !it.noDirectCheck && !(Array.isArray(it.subItems) && it.subItems.length > 0)),
+  ...OTHER_BADGES.map((ob) => ({
+    ...ob,
+    badgeId: 'OT',
+    badgeName: '其他獎章',
+    badgeEn: 'Other Badges',
+    segmentCode: 'OT',
+    segmentName: '其他獎章',
+    segmentEn: 'Other Badges',
+    isOtherBadge: true,
+  })),
+];
+
 /** 保持 scoutId 與 memberNo 同步，清除舊 ymis 欄位。 */
 export function syncIdentity(member) {
   if (!member) return member;
@@ -291,8 +323,7 @@ export function membershipStatus(book) {
 
 // ------------------------------------------------- vsbadge 雙向互通
 
-export function exportForVsBadge(book, troopId = '') {
-  const sid = scoutId(book?.member) || 'UNSET';
+function collectFlatProgress(book) {
   const progress = {};
   Object.entries(book?.progress || {}).forEach(([itemId, state]) => {
     if (state?.date) progress[itemId] = state.date;
@@ -306,12 +337,41 @@ export function exportForVsBadge(book, troopId = '') {
   if (book?.pages?.p35?.completedDate && !progress['OT-ROVER-LINK']) {
     progress['OT-ROVER-LINK'] = book.pages.p35.completedDate;
   }
+  return progress;
+}
 
+function collectBadgeDates(book) {
   const badges = {};
   if (book?.pages?.p10?.investitureDate) badges.L1 = book.pages.p10.investitureDate;
   if (book?.pages?.p13?.completedDate) badges.L2 = book.pages.p13.completedDate;
   if (book?.pages?.p20?.completedDate) badges.L3 = book.pages.p20.completedDate;
   if (book?.pages?.p33?.completedDate) badges.L4 = book.pages.p33.completedDate;
+  return badges;
+}
+
+/** 純進度匯出給 vsbadge（不錄入任何個人資料，只保留 SCOUT ID 與完成日期）。 */
+export function exportProgressOnlyForVsBadge(book, troopId = '') {
+  const sid = scoutId(book?.member) || 'UNSET';
+  const progress = collectFlatProgress(book);
+  const badges = collectBadgeDates(book);
+  return {
+    info: 'VSBOOK 純進度匯出 · 不含任何個人資料（只含 SCOUT ID 與訓練進度）',
+    privacy: 'progress-only',
+    troopId,
+    exportedAt: new Date().toISOString(),
+    progress: { [sid]: progress },
+    progress_mock: { 說明: 'VSBOOK 純進度匯出（不含個人資料）', [sid]: progress },
+    badges,
+    source: 'VSBOOK',
+    schema: 'vsbadge.progress.v1',
+  };
+}
+
+export function exportForVsBadge(book, troopId = '', opts = {}) {
+  if (opts?.progressOnly) return exportProgressOnlyForVsBadge(book, troopId);
+  const sid = scoutId(book?.member) || 'UNSET';
+  const progress = collectFlatProgress(book);
+  const badges = collectBadgeDates(book);
 
   return {
     info: 'VSBOOK 匯出 · 可直接匯入 vsbadge（2026 第十一版深資童軍訓練綱要）',
@@ -333,6 +393,239 @@ export function exportForVsBadge(book, troopId = '') {
     badges,
     source: 'VSBOOK',
     schema: 'vsbadge.progress.v1',
+  };
+}
+
+/** 計算單一成員純進度表的四階（L1–L4）與其他獎章完成統計。 */
+export function rosterMemberStats(flatProgress = {}, otherBadges = {}) {
+  const progressObj = {};
+  Object.entries(flatProgress || {}).forEach(([id, val]) => {
+    const date = typeof val === 'string' ? val : val?.date || '';
+    if (date) progressObj[id] = { date };
+  });
+  Object.entries(otherBadges || {}).forEach(([id, val]) => {
+    const date = typeof val === 'string' ? val : val?.date || '';
+    if (date && !progressObj[id]) progressObj[id] = { date };
+  });
+  const pseudoBook = newBook({ progress: progressObj });
+  const l1 = badgeStats(pseudoBook, 'L1');
+  const l2 = badgeStats(pseudoBook, 'L2');
+  const l3 = badgeStats(pseudoBook, 'L3');
+  const l4 = badgeStats(pseudoBook, 'L4');
+  const otDone = OTHER_BADGES.filter((ob) => Boolean(progressObj[ob.id]?.date)).length;
+  const total = l1.total + l2.total + l3.total + l4.total;
+  const done = l1.done + l2.done + l3.done + l4.done;
+  return {
+    l1,
+    l2,
+    l3,
+    l4,
+    otDone,
+    otTotal: OTHER_BADGES.length,
+    done,
+    total,
+    percent: total ? Math.round((done / total) * 100) : 0,
+  };
+}
+
+/**
+ * 解析 vsbadge 後端 load 回應或進度 JSON，轉為「只含進度、零個人資料」的全團成員清單。
+ * 任何電話、電郵、地址、出生日期、身份證、相片、緊急聯絡人等個人欄位一律丟棄。
+ */
+export function parseVsBadgeRoster(json) {
+  if (!json || typeof json !== 'object') throw new Error('vsbadge 資料格式不正確');
+
+  const byId = new Map();
+  const ensure = (rawId, rawLabel = '', rawRole = 'member', rawJoinDate = '') => {
+    const sid = normalizeScoutId(rawId);
+    if (!sid || sid === '說明') return null;
+    let key = sid;
+    for (const existing of byId.keys()) {
+      if (sameScoutId(existing, sid)) {
+        key = existing;
+        break;
+      }
+    }
+    if (!byId.has(key)) {
+      byId.set(key, {
+        scoutId: key,
+        label: String(rawLabel || '').trim().slice(0, 40),
+        role: String(rawRole || 'member').trim(),
+        joinDate: String(rawJoinDate || '').trim().slice(0, 10),
+        progress: {},
+        otherBadges: {},
+      });
+    } else {
+      const cur = byId.get(key);
+      if (!cur.label && rawLabel) cur.label = String(rawLabel).trim().slice(0, 40);
+      if (!cur.joinDate && rawJoinDate) cur.joinDate = String(rawJoinDate).trim().slice(0, 10);
+    }
+    return byId.get(key);
+  };
+
+  if (Array.isArray(json.members)) {
+    json.members.forEach((m) => {
+      if (!m || typeof m !== 'object') return;
+      const role = String(m.role || 'member');
+      if (['branch_leader', 'leader', 'gsl', 'super_admin'].includes(role) && !m.ymis && !m.scoutId) return;
+      const sid = m.ymis || m.scoutId || m.memberNo;
+      if (!sid) return;
+      ensure(sid, m.name || m.nameZh || '', role, m.joinDate || '');
+    });
+  }
+
+  const progSources = [json.flatProgress, json.progress, json.progress_mock].filter((x) => x && typeof x === 'object');
+  for (const src of progSources) {
+    for (const [sid, map] of Object.entries(src)) {
+      if (sid === '說明' || !map || typeof map !== 'object') continue;
+      if (ITEM_INDEX[sid]) continue;
+      const rec = ensure(sid);
+      if (!rec) continue;
+      for (const [itemId, val] of Object.entries(map)) {
+        if (!ITEM_INDEX[itemId]) continue;
+        const date = typeof val === 'string' ? val : val?.date || '';
+        if (date) rec.progress[itemId] = date;
+      }
+    }
+  }
+
+  if (json.otherBadges && typeof json.otherBadges === 'object') {
+    for (const [sid, map] of Object.entries(json.otherBadges)) {
+      if (!map || typeof map !== 'object') continue;
+      const rec = ensure(sid);
+      if (!rec) continue;
+      for (const [badgeId, val] of Object.entries(map)) {
+        if (!ITEM_INDEX[badgeId]) continue;
+        const date = typeof val === 'string' ? val : val?.date || '';
+        if (date) {
+          rec.otherBadges[badgeId] = date;
+          if (!rec.progress[badgeId]) rec.progress[badgeId] = date;
+        }
+      }
+    }
+  }
+
+  const members = [...byId.values()]
+    .filter((m) => !['branch_leader', 'leader', 'gsl', 'super_admin'].includes(m.role))
+    .sort((a, b) => String(a.scoutId).localeCompare(String(b.scoutId)));
+
+  return {
+    troopId: String(json.troopId || '').trim(),
+    members,
+  };
+}
+
+/**
+ * 將掃描到的單一成員 VS1 二維碼併入領袖全團進度清單（只保留 SCOUT ID 與進度，主動剝除個人私隱欄位）。
+ */
+export function mergeMemberPayloadIntoRoster(roster = [], payload) {
+  const sid = normalizeScoutId(payload?.scoutId || payload?.member?.scoutId || payload?.member?.memberNo);
+  if (!sid) {
+    throw new Error('此二維碼未包含童軍成員編號（SCOUT ID），請成員先填寫第 1 頁編號後再出示');
+  }
+  const next = (roster || []).map((m) => ({
+    scoutId: m.scoutId,
+    label: m.label || '',
+    role: m.role || 'member',
+    joinDate: m.joinDate || '',
+    progress: { ...(m.progress || {}) },
+    otherBadges: { ...(m.otherBadges || {}) },
+  }));
+
+  const label = String(payload?.member?.nameZh || payload?.member?.nameEn || '').trim().slice(0, 40);
+  let target = next.find((m) => sameScoutId(m.scoutId, sid));
+  if (!target) {
+    target = { scoutId: sid, label, role: 'member', joinDate: '', progress: {}, otherBadges: {} };
+    next.push(target);
+  } else if (!target.label && label) {
+    target.label = label;
+  }
+
+  Object.entries(payload?.progress || {}).forEach(([itemId, val]) => {
+    if (!ITEM_INDEX[itemId]) return;
+    const date = typeof val === 'string' ? val : val?.date || '';
+    if (!date) return;
+    target.progress[itemId] = date;
+    if (ITEM_INDEX[itemId]?.isOtherBadge) target.otherBadges[itemId] = date;
+  });
+
+  next.sort((a, b) => String(a.scoutId).localeCompare(String(b.scoutId)));
+  return { roster: next, scoutId: target.scoutId };
+}
+
+/**
+ * 建立「一簽簽發所有成員」純進度批次資料（同時支援寫入 vsbadge 雲端 API 及匯出離線 JSON，零個人資料）。
+ */
+export function buildVsBadgeBatchPayload({
+  troopId = '',
+  confirmer = '',
+  scoutIds = [],
+  itemIds = [],
+  date = today(),
+  note = 'VSBOOK 領袖一簽簽發',
+  existingRoster = [],
+}) {
+  const cleanIds = [...new Set((scoutIds || []).map(normalizeScoutId).filter(Boolean))];
+  const cleanItems = [...new Set((itemIds || []).filter((id) => Boolean(ITEM_INDEX[id])))];
+  const safeDate = /^\d{4}-\d{2}-\d{2}$/.test(String(date || '')) ? String(date) : today();
+  const safeConfirmer = String(confirmer || '').trim().slice(0, 60);
+  const safeNote = String(note || '').trim().slice(0, 200);
+
+  const changes = [];
+  const otherBadgeRecords = [];
+  const progress = {};
+
+  for (const existing of existingRoster || []) {
+    if (!existing?.scoutId) continue;
+    progress[existing.scoutId] = { ...(existing.progress || {}) };
+  }
+
+  for (const sid of cleanIds) {
+    const ymis = /^\d+$/.test(sid) && sid.length < 10 ? sid : sid;
+    if (!progress[ymis]) progress[ymis] = {};
+    for (const itemId of cleanItems) {
+      const meta = ITEM_INDEX[itemId];
+      progress[ymis][itemId] = safeDate;
+      if (meta?.isOtherBadge) {
+        otherBadgeRecords.push({
+          ymis,
+          badgeId: itemId,
+          badgeName: meta.name || itemId,
+          date: safeDate,
+          cert: '',
+        });
+      } else {
+        changes.push({
+          ymis,
+          itemId,
+          date: safeDate,
+          uncomplete: false,
+          confirmer: safeConfirmer,
+          ...(safeNote ? { note: safeNote } : {}),
+        });
+      }
+    }
+  }
+
+  return {
+    changes,
+    otherBadgeRecords,
+    json: {
+      info: 'VSBOOK 領袖一簽簽發 · vsbadge 純進度批次檔（不錄入個人資料）',
+      privacy: 'progress-only',
+      troopId: String(troopId || '').trim(),
+      confirmer: safeConfirmer,
+      exportedAt: new Date().toISOString(),
+      progress,
+      progress_mock: {
+        說明: 'VSBOOK 領袖一簽簽發純進度（不含個人資料）',
+        ...progress,
+      },
+      changes,
+      otherBadgeRecords,
+      source: 'VSBOOK-LEADER-BATCH',
+      schema: 'vsbadge.progress.v1',
+    },
   };
 }
 

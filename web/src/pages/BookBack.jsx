@@ -5,6 +5,7 @@ import {
   PRINT_PAGES,
   demoBook,
   exportForVsBadge,
+  exportProgressOnlyForVsBadge,
   importFromVsBadge,
   newBook,
   today,
@@ -353,20 +354,25 @@ export function AppendixPage() {
         </h3>
         <p className="tiny">
           {isEn
-            ? 'Uses identical Scout ID and L1–L4 / OT-* item codes. Importing never overwrites existing signatures.'
-            : '共用同一童軍成員編號（Scout ID）與 L1–L4／OT-* 項目編號；匯入時只填補新進度，不會覆蓋本機已有的日期與領袖簽名。'}
+            ? 'Uses identical Scout ID and L1–L4 / OT-* item codes. Progress-only export contains zero personal particulars.'
+            : '共用同一童軍成員編號與四階／其他獎章編號；純進度匯出不含任何個人資料，匯入時亦不會覆蓋本機已有的領袖簽名。'}
         </p>
         <div className="appxbtns">
           <button
             type="button"
             className="btn btn--primary btn--sm"
             onClick={() => {
-              const payload = exportForVsBadge(book);
-              download(`vsbook-for-vsbadge-${slugify(book.member?.scoutId || book.member?.nameZh)}.json`, payload);
-              push(isEn ? 'Exported vsbadge JSON' : '已匯出可餵給 vsbadge 的進度 JSON');
+              const payload = exportProgressOnlyForVsBadge(book);
+              download(`vsbook-progress-only-${slugify(book.member?.scoutId || 'member')}.json`, payload);
+              push(
+                isEn
+                  ? 'Exported progress-only JSON for vsbadge (no personal data)'
+                  : '已匯出純進度 JSON（不含個人資料，可直接餵給 vsbadge）',
+              );
             }}
           >
-            <Icon name="download" size={14} /> {isEn ? 'Export for vsbadge' : '匯出給 vsbadge'}
+            <Icon name="download" size={14} />{' '}
+            {isEn ? 'Export Progress Only for vsbadge' : '匯出純進度給 vsbadge（免個人資料）'}
           </button>
           <input ref={vsbadgeInput} type="file" accept="application/json,.json" hidden onChange={onImportVsBadge} />
           <button type="button" className="btn btn--ghost btn--sm" onClick={() => vsbadgeInput.current?.click()}>

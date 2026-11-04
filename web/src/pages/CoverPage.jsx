@@ -8,7 +8,7 @@ import { LegalLine } from '../components/Legal.jsx';
  * 全屏深資童軍酒紅布面燙金封面（1:1 對齊 ROVERBOOK CoverPage）：
  * 整個螢幕就是紀錄冊封面（The whole screen is the cover）。
  */
-export default function CoverPage({ book, onOpen, last, onContinue, onLeader }) {
+export default function CoverPage({ book, onOpen, last, onContinue, onLeader, leaderActive = false }) {
   const { isEn } = useLang();
   const m = book?.member || {};
   const stats = allStats(book);
@@ -90,7 +90,13 @@ export default function CoverPage({ book, onOpen, last, onContinue, onLeader }) 
             </button>
             {onLeader && (
               <button type="button" className="coverart__leader" onClick={onLeader}>
-                {isEn ? 'Leader mode' : '領袖模式'}
+                {leaderActive
+                  ? isEn
+                    ? 'Leader Workbench'
+                    : '全團進度 · 一簽簽發'
+                  : isEn
+                    ? 'Leader mode'
+                    : '領袖模式'}
               </button>
             )}
           </div>

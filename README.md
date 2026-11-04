@@ -38,16 +38,23 @@ rm -rf dist && node scripts/preflight_v1.0.mjs . --json
 5. **分開「領袖模式（只讀）」與「普通模式（不能讀）」（`VS1.` 協定 + `/api/leader`）**：
    - **普通模式（預設 · 不能讀取他人紀錄冊）**：成員可填寫自己的紀錄冊並「出示二維碼」（預設全不選，私隱自決），但**不開放任何讀取／掃描成員紀錄冊的入口**；僅可在「出示二維碼」視窗貼上領袖簽發的 `VS1S.` 核簽回傳碼寫入簽名。
    - **領袖模式（只讀 · Read-Only）**：輸入伺服器端環境變數 `LEADER_CODE`（經 `/api/leader` 以 `crypto.timingSafeEqual` 驗證，絕不暴露於前端 bundle）後開啟 12 小時；領袖可透過 `/scan` 或 `#v=` 唯讀查閱成員分享內容並簽發 `VS1S.` 核簽回傳碼，同時本機紀錄冊鎖定為只讀狀態，杜絕誤改。
-6. **與 `vsbadge` 雙向進度互通**：統一採用 `SCOUT ID`（童軍成員編號）及 2026 第十一版項目編號（`L1-*`、`L2-*`、`L3-*`、`L4-*`、`OT-*`），可直接匯入／匯出 `vsbadge` 進度 JSON。
+6. **配合兄弟系統 `vsbadge` 後端 · 一次看全團進度及「一簽簽發所有成員」（只錄入進度，不錄入個人資料）**：
+   - 統一採用童軍成員編號 `SCOUT ID`（即 `vsbadge` 的 `YMIS`）及 2026 第十一版項目編號（`L1-*`、`L2-*`、`L3-*`、`L4-*`、`OT-*`）。
+   - 在領袖模式（`/scan/batch`）可直接經伺服器端 `/api/vsbadge` 連接 `vsbadge` 旅團後端（或匯入 `vsbadge` JSON／連續掃描成員純進度 QR），**一次過檢視所有成員的四階進度**。
+   - **一簽簽發所有成員**：領袖揀選多位成員與完成細項後**只需簽名一次**，即可同時產生**全體通用核簽回傳碼（`VS1.`）**供所有已選成員掃描寫入各自手機紀錄冊，並一鍵同步純進度回 `vsbadge` 雲端或匯出純進度 JSON —— **全程絕不錄入或傳送任何個人資料**。
 7. **中英文完全分開（節省版面）與全套 Favicon／PWA 圖示**：頂欄與歡迎頁一鍵切換繁體中文／English，單語乾淨呈現、不並排重複佔位；齊備 `/favicon.svg`、`/favicon.ico`、`/favicon-32.png`、`/favicon-48.png` 及 `/icons/*` 全套 iOS / Android 主畫面與 OG 圖示。
 
-### Vercel 部署設定（領袖密碼 `LEADER_CODE`）
+### Vercel 部署設定（領袖密碼 `LEADER_CODE` 及 `vsbadge` 後端配合）
 
 在 Vercel → **Project → Settings → Environment Variables** 新增（**請勿加 `VITE_` 前綴**）：
 
-- **Name**：`LEADER_CODE`
-- **Value**：你設定的領袖密碼（本機 `npm run dev` 未設定時預設為 `1234` 方便測試）
-- 設定後重新部署（Redeploy）；若未設定 `LEADER_CODE`，系統會自動隱藏領袖模式入口，作為純成員版運作。
+1. **`LEADER_CODE`**（必填以啟用領袖模式）：
+   - **Name**：`LEADER_CODE`
+   - **Value**：你設定的領袖密碼（本機 `npm run dev` 未設定時預設為 `1234` 方便測試）
+   - **Scope**：`Production`（及 `Preview`）
+   - 設定後重新部署（Redeploy）；若未設定 `LEADER_CODE`，系統會自動隱藏領袖模式入口，作為純成員版運作。
+2. **`VSBADGE_ORIGIN`**（選填，預設自動對接 `https://vsbadge.vercel.app`）：
+   - 如使用預設 `https://vsbadge.vercel.app` 作為旅團進度後端，**無須額外設定**即可直接在領袖模式登入旅團並讀寫純進度；如有自建 `vsbadge` 網址，可設 `VSBADGE_ORIGIN=https://你的-vsbadge-網址`。
 
 ---
 

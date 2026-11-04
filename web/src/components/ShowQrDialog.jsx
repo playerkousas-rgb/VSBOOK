@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import jsQR from 'jsqr';
 import { Icon, Modal, useToast } from '../ui.jsx';
 import { useBook } from '../bookContext.js';
 import { qrSvg } from '../qr.js';
@@ -16,7 +17,9 @@ export default function ShowQrDialog({ open, onClose }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [showSignoffBox, setShowSignoffBox] = useState(false);
+  const [scanSignoffCam, setScanSignoffCam] = useState(false);
   const [signoffCode, setSignoffCode] = useState('');
+  const camVideoRef = useRef(null);
 
   useEffect(() => {
     if (open) {
@@ -24,6 +27,7 @@ export default function ShowQrDialog({ open, onClose }) {
       setResult(null);
       setSvg('');
       setError('');
+      setScanSignoffCam(false);
     }
   }, [open]);
 
@@ -48,12 +52,106 @@ export default function ShowQrDialog({ open, onClose }) {
           setSvg('');
         }
       })
-      .catch((e) => alive && setError(e.message || '未能產生二維碼'))
+      .catch((e) => alive && setError(e.message || (isEn ? 'Failed to generate QR' : '未能產生二維碼')))
       .finally(() => alive && setBusy(false));
     return () => {
       alive = false;
     };
-  }, [open, selected, book]);
+  }, [open, selected, book, isEn]);
+
+  // 普通模式專用：只接受領袖簽發的核簽回傳碼（KIND_SIGNOFF），嚴禁讀取他人紀錄冊（KIND_MEMBER）
+  const acceptSignoffRaw = async (rawText) => {
+    const payload = await decodePayload(rawText);
+    if (payload.t !== KIND_SIGNOFF) {
+      throw new Error(
+        isEn
+          ? 'Normal mode cannot read member record books. Only Leader Sign-off Return QRs are accepted.'
+          : '普通模式不能讀取他人紀錄冊；此處只接收領袖簽發的核簽回傳碼。',
+      );
+    }
+    window.sessionStorage.setItem('vsbook.scan.signoff.v1', JSON.stringify(payload));
+    setScanSignoffCam(false);
+    onClose();
+    navigate('/scan/signoff');
+  };
+
+  useEffect(() => {
+    if (!open || !scanSignoffCam) return undefined;
+    let stream = null;
+    let raf = 0;
+    let stopped = false;
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+    const stop = () => {
+      stopped = true;
+      if (raf) cancelAnimationFrame(raf);
+      if (stream) stream.getTracks().forEach((t) => t.stop());
+    };
+
+    const tick = async () => {
+      if (stopped) return;
+      const v = camVideoRef.current;
+      if (v && v.readyState >= 2 && v.videoWidth > 0 && ctx) {
+        const scale = Math.min(1, 560 / v.videoWidth);
+        canvas.width = Math.round(v.videoWidth * scale);
+        canvas.height = Math.round(v.videoHeight * scale);
+        ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+        const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+        if (code?.data) {
+          try {
+            stop();
+            await acceptSignoffRaw(code.data);
+            return;
+          } catch (err) {
+            setError(err.message || (isEn ? 'Invalid sign-off QR' : '核簽二維碼無效'));
+            setScanSignoffCam(false);
+            return;
+          }
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+
+    (async () => {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setScanSignoffCam(false);
+        setShowSignoffBox(true);
+        setError(
+          isEn
+            ? 'Camera unavailable on this browser. Paste the return code below.'
+            : '此瀏覽器不支援鏡頭掃描，請在下方貼上回傳碼。',
+        );
+        return;
+      }
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' } },
+          audio: false,
+        });
+        if (stopped) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        if (camVideoRef.current) {
+          camVideoRef.current.srcObject = stream;
+          await camVideoRef.current.play().catch(() => {});
+        }
+        raf = requestAnimationFrame(tick);
+      } catch {
+        setScanSignoffCam(false);
+        setShowSignoffBox(true);
+        setError(
+          isEn
+            ? 'Camera permission denied. Paste the return code below.'
+            : '未能開啟鏡頭，請改為貼上回傳碼。',
+        );
+      }
+    })();
+
+    return stop;
+  }, [open, scanSignoffCam, isEn]);
 
   if (!open) return null;
 
@@ -61,7 +159,9 @@ export default function ShowQrDialog({ open, onClose }) {
     setSelected((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
 
   const ratio = result ? Math.min(100, Math.round((result.chars / QR_LIMIT) * 100)) : 0;
-  const heavyChosen = TRANSFER_OPTIONS.filter((o) => o.heavy && selected.includes(o.key)).map((o) => o.label);
+  const heavyChosen = TRANSFER_OPTIONS.filter((o) => o.heavy && selected.includes(o.key)).map((o) =>
+    isEn ? o.en : o.label,
+  );
 
   return (
     <Modal
@@ -70,18 +170,27 @@ export default function ShowQrDialog({ open, onClose }) {
       title={isEn ? 'Choose Sections to Present' : '揀選今次要給領袖查閱的內容'}
       subtitle={
         isEn
-          ? 'Members can only show their own QR code. Ask your leader to enter Leader Mode (Read-Only) in VSBOOK to scan.'
-          : '普通模式只可出示自己的二維碼（不能讀取他人紀錄冊）。請領袖在 VSBOOK 開啟「領袖模式（只讀）」後掃描查閱或核簽。'
+          ? 'Members can only show their own QR code or scan a Leader Return QR. Ask your leader to enter Leader Mode in VSBOOK to scan.'
+          : '普通模式只可出示自己的二維碼或接收領袖核簽碼（不能讀取他人紀錄冊）。請領袖開啟領袖模式掃描查閱或一簽簽發。'
       }
       wide
     >
       <div className="qrquick">
         <button
           type="button"
+          className="btn btn--gold btn--sm"
+          onClick={() => setSelected(['progress'])}
+        >
+          {isEn
+            ? 'Progress Only (Scout ID + Progress · Zero Personal Data)'
+            : '純進度出示（只含成員編號＋進度 · 不含個人資料）'}
+        </button>
+        <button
+          type="button"
           className="btn btn--ghost btn--sm"
           onClick={() => setSelected(['particulars', 'progress', 'summaries'])}
         >
-          {isEn ? 'Preset: For Leader Sign-off' : '常用組合：給領袖核簽（個人＋進度＋簡述）'}
+          {isEn ? 'Preset: Full Leader Sign-off' : '完整核簽組合（個人＋進度＋簡述）'}
         </button>
         {selected.length > 0 && (
           <button type="button" className="linkbtn" onClick={() => setSelected([])}>
@@ -128,9 +237,14 @@ export default function ShowQrDialog({ open, onClose }) {
               <p>
                 {isEn
                   ? 'Please untick heavy image items or use JSON export in Digital Appendix.'
-                  : '相片或大量手寫墨跡超出單張二維碼容量；請先取消大檔項目，或改用「複製唯讀連結」／匯出 JSON。'}
+                  : '相片或大量手寫墨跡超出單張二維碼容量；請先取消大檔項目，或改用複製唯讀連結／匯出備份檔。'}
               </p>
-              {heavyChosen.length > 0 && <p className="tiny">建議先取消：{heavyChosen.join('、')}</p>}
+              {heavyChosen.length > 0 && (
+                <p className="tiny">
+                  {isEn ? 'Suggested to untick: ' : '建議先取消：'}
+                  {heavyChosen.join('、')}
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -143,23 +257,54 @@ export default function ShowQrDialog({ open, onClose }) {
               <i style={{ width: `${ratio}%` }} />
             </span>
             <span className="tiny">
-              {result.chars} / {QR_LIMIT} chars · {result.compressed ? (isEn ? 'gzip compressed' : 'gzip 已壓縮') : 'raw'}
+              {result.chars} / {QR_LIMIT} · {result.compressed ? (isEn ? 'gzip compressed' : 'gzip 已壓縮') : 'raw'}
             </span>
           </div>
         )}
       </div>
 
       <div className="qrsignoff-in">
-        <button
-          type="button"
-          className="linkbtn"
-          onClick={() => {
-            setShowSignoffBox((v) => !v);
-            setError('');
-          }}
-        >
-          {isEn ? 'Have a Leader Sign-off Slip (VS1S.)? Paste here' : '收到領袖簽發的「核簽回傳碼（VS1S.）」？點此貼上寫入'}
-        </button>
+        <div className="qrsignoff-in__triggers">
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm"
+            onClick={() => {
+              setScanSignoffCam((v) => !v);
+              setError('');
+            }}
+          >
+            <Icon name="camera" size={14} />{' '}
+            {scanSignoffCam
+              ? isEn
+                ? 'Close Camera'
+                : '關閉鏡頭'
+              : isEn
+                ? 'Scan Leader Return QR'
+                : '相機掃描領袖核簽回傳碼'}
+          </button>
+          <button
+            type="button"
+            className="linkbtn"
+            onClick={() => {
+              setShowSignoffBox((v) => !v);
+              setError('');
+            }}
+          >
+            {isEn ? 'Or paste return code (VS1.)' : '或點此貼上回傳碼（VS1.）'}
+          </button>
+        </div>
+
+        {scanSignoffCam && (
+          <div className="qrsignoff-cam">
+            <video ref={camVideoRef} playsInline muted autoPlay />
+            <p className="tiny">
+              {isEn
+                ? 'Point at the Leader’s Return QR or Universal One-Sign Batch QR.'
+                : '對準領袖手機上的「核簽回傳碼」或「一簽全體通用核簽碼」即可自動讀取。'}
+            </p>
+          </div>
+        )}
+
         {showSignoffBox && (
           <div className="qrsignoff-in__row">
             <input
@@ -169,25 +314,14 @@ export default function ShowQrDialog({ open, onClose }) {
                 setSignoffCode(e.target.value);
                 setError('');
               }}
-              placeholder="VS1S...."
+              placeholder="VS1...."
             />
             <button
               type="button"
               className="btn btn--ghost btn--sm"
               onClick={async () => {
                 try {
-                  const payload = await decodePayload(signoffCode);
-                  if (payload.t !== KIND_SIGNOFF) {
-                    setError(
-                      isEn
-                        ? 'Normal mode cannot read member record books. Enter Leader Mode (Read-Only) first.'
-                        : '普通模式不能讀取他人紀錄冊；此欄只接收領袖簽發的 VS1S. 核簽回傳碼。',
-                    );
-                    return;
-                  }
-                  window.sessionStorage.setItem('vsbook.scan.signoff.v1', JSON.stringify(payload));
-                  onClose();
-                  navigate('/scan/signoff');
+                  await acceptSignoffRaw(signoffCode);
                 } catch (e) {
                   setError(e.message || (isEn ? 'Invalid sign-off code' : '核簽回傳碼格式不正確'));
                 }

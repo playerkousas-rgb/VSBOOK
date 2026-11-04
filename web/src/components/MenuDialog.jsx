@@ -111,24 +111,48 @@ export default function MenuDialog({ open, onClose, onShowQr, leader = false, le
         )}
 
         {leader ? (
-          <button
-            type="button"
-            className="menu__item menu__item--accent"
-            onClick={() => {
-              onClose();
-              navigate('/scan');
-            }}
-          >
-            <Icon name="qr" size={18} />
-            <span>
-              <strong>{isEn ? 'Scan Member QR Code (Leader · Read-Only)' : '掃描二維碼（領袖 · 只讀檢視）'}</strong>
-              <em>
-                {isEn
-                  ? 'Read a member’s shared book in read-only mode and sign items off'
-                  : '唯讀查閱成員出示的紀錄冊內容，核對後可簽署回傳碼'}
-              </em>
-            </span>
-          </button>
+          <>
+            <button
+              type="button"
+              className="menu__item menu__item--accent"
+              onClick={() => {
+                onClose();
+                navigate('/scan/batch');
+              }}
+            >
+              <Icon name="seal" size={18} />
+              <span>
+                <strong>
+                  {isEn
+                    ? 'All-Members Progress & One-Sign (vsbadge)'
+                    : '全團進度總覽 · 一簽簽發所有成員（vsbadge）'}
+                </strong>
+                <em>
+                  {isEn
+                    ? 'Inspect all members’ progress at once and sign once to issue sign-offs (progress only, zero personal data)'
+                    : '配合 vsbadge 後端一次看全團進度，簽名一次簽發全體成員（只錄入進度，不錄入個人資料）'}
+                </em>
+              </span>
+            </button>
+            <button
+              type="button"
+              className="menu__item"
+              onClick={() => {
+                onClose();
+                navigate('/scan');
+              }}
+            >
+              <Icon name="qr" size={18} />
+              <span>
+                <strong>{isEn ? 'Scan Member QR Code (Leader · Read-Only)' : '掃描成員二維碼（領袖 · 只讀檢視）'}</strong>
+                <em>
+                  {isEn
+                    ? 'Read a member’s shared book in read-only mode and sign items off'
+                    : '唯讀查閱成員出示的紀錄冊內容，核對後可簽署回傳碼'}
+                </em>
+              </span>
+            </button>
+          </>
         ) : null}
 
         <button type="button" className="menu__item" onClick={() => onShowQr?.()}>

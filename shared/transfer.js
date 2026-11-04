@@ -5,6 +5,8 @@
  * 全程零伺服器、零雲端上傳。
  */
 
+import { normalizeScoutId, sameScoutId } from './book.js';
+
 export const TRANSFER_PREFIX = 'VS1';
 export const TRANSFER_VERSION = 1;
 export const KIND_MEMBER = 'vsbook/member';
@@ -116,6 +118,8 @@ export function buildPayload(book, selection = []) {
     payload.contact = pick(m, ['phone', 'email', 'addressZh', 'addressEn', 'emergencyName', 'emergencyPhone']);
   }
   if (chosen.has('progress')) {
+    const sid = clean(m.scoutId || m.memberNo);
+    if (sid) payload.scoutId = sid;
     const progress = {};
     Object.entries(book?.progress || {}).forEach(([id, entry]) => {
       if (!entry) return;
@@ -250,16 +254,23 @@ export async function encodeTransfer(book, selection) {
   return encodePayload(buildPayload(book, selection));
 }
 
-export async function encodeSignoff({ member, leader, items, note }) {
+export async function encodeSignoff({ member, leader, items, note, targets }) {
+  const cleanTargets = Array.isArray(targets)
+    ? [...new Set(targets.map(normalizeScoutId).filter(Boolean))]
+    : [];
   const payload = {
     t: KIND_SIGNOFF,
     v: TRANSFER_VERSION,
     at: new Date().toISOString(),
     seq: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
-    member: {
-      nameZh: member?.nameZh || '',
-      scoutId: member?.scoutId || member?.memberNo || '',
-    },
+    ...(cleanTargets.length > 0
+      ? { batch: true, targets: cleanTargets }
+      : {
+          member: {
+            nameZh: member?.nameZh || '',
+            scoutId: member?.scoutId || member?.memberNo || '',
+          },
+        }),
     leader: {
       name: leader?.name || '',
       title: leader?.title || '深資童軍團長 VSL',
@@ -277,6 +288,15 @@ export async function encodeSignoff({ member, leader, items, note }) {
   return encodePayload(payload);
 }
 
+/**
+ * 一簽簽發所有成員：只把各成員 SCOUT ID、領袖簽名與完成項目編入單一通用回傳二維碼，絕不寫入任何個人資料。
+ */
+export async function encodeBatchSignoff({ targets = [], leader, items = [], note = 'VSBOOK 領袖一簽簽發' }) {
+  const cleanTargets = [...new Set((targets || []).map(normalizeScoutId).filter(Boolean))];
+  if (!cleanTargets.length) throw new Error('請至少揀選一位成員（SCOUT ID）');
+  return encodeSignoff({ targets: cleanTargets, leader, items, note });
+}
+
 /** 抽取純 VS1 字串（同時支援直接掃描 VS1... 或貼上含 #v=VS1... 的完整網址）。 */
 export function extractToken(rawInput) {
   const s = String(rawInput || '').trim();
@@ -289,7 +309,7 @@ export function extractToken(rawInput) {
 
 export async function decodePayload(rawInput) {
   const input = extractToken(rawInput);
-  const match = /^VS1(P?)\.([A-Za-z0-9_-]+)$/.exec(input);
+  const match = /^VS1S?(P?)\.([A-Za-z0-9_-]+)$/.exec(input);
   if (!match) throw new Error('這不是 VSBOOK 的二維碼（應以 VS1. 開頭）');
   let bytes = fromBase64Url(match[2]);
   if (!match[1]) {
@@ -316,17 +336,35 @@ export async function decodeTransfer(rawInput) {
 
 export function applySignoff(book, payload) {
   if (!payload || payload.t !== KIND_SIGNOFF) throw new Error('這不是有效的領袖核簽單');
+  if (Array.isArray(payload.targets) && payload.targets.length > 0) {
+    const myId = normalizeScoutId(book?.member?.scoutId || book?.member?.memberNo);
+    if (!myId) {
+      throw new Error('請先在第 1 頁填寫你的童軍成員編號（SCOUT ID），再寫入領袖批量核簽單');
+    }
+    const matched = payload.targets.some((tid) => sameScoutId(tid, myId));
+    if (!matched) {
+      throw new Error(`此批量核簽單未包含你的 SCOUT ID（${myId}），請向領袖確認`);
+    }
+  } else if (payload?.member?.scoutId) {
+    const myId = normalizeScoutId(book?.member?.scoutId || book?.member?.memberNo);
+    if (myId && !sameScoutId(payload.member.scoutId, myId)) {
+      throw new Error(`此核簽單屬於 SCOUT ID ${payload.member.scoutId}，與本機（${myId}）不符`);
+    }
+  }
+
   const next = structuredClone(book);
   const changes = [];
   next.progress = next.progress || {};
+  next.pages = next.pages || {};
 
   (payload.items || []).forEach((item) => {
     if (!item?.id || !item.verified) return;
     const current = next.progress[item.id] || {};
     const before = { date: current.date || '', assessor: current.assessor || '' };
+    const finalDate = item.date || current.date || new Date().toISOString().slice(0, 10);
     next.progress[item.id] = {
       ...current,
-      date: item.date || current.date || new Date().toISOString().slice(0, 10),
+      date: finalDate,
       assessor: item.assessor || payload.leader?.name || current.assessor || '',
       at: new Date().toISOString(),
       signedAt: payload.at,
@@ -341,6 +379,13 @@ export function applySignoff(book, payload) {
           }
         : {}),
     };
+    if (item.id === 'OT-FA') {
+      next.pages.p34 = { ...(next.pages.p34 || {}), faCompletedDate: next.pages.p34?.faCompletedDate || finalDate };
+    } else if (item.id === 'OT-WORLD-SW-AWARD') {
+      next.pages.p34 = { ...(next.pages.p34 || {}), swaCompletedDate: next.pages.p34?.swaCompletedDate || finalDate };
+    } else if (item.id === 'OT-ROVER-LINK') {
+      next.pages.p35 = { ...(next.pages.p35 || {}), completedDate: next.pages.p35?.completedDate || finalDate };
+    }
     changes.push({
       id: item.id,
       before,

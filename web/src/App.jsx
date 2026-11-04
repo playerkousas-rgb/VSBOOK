@@ -62,7 +62,7 @@ function BookApp({ book, saveIssue, leader, leaderReady }) {
   const leaderRoute = path === '/leader';
   const section = path.startsWith('/p/') ? path.slice(3) : null;
   const formId = path.startsWith('/forms') ? path.split('/').filter(Boolean)[1] || 'index' : null;
-  const scanPath = ['/scan', '/scan/view', '/scan/signoff'].includes(path) ? path : null;
+  const scanPath = ['/scan', '/scan/batch', '/scan/view', '/scan/signoff'].includes(path) ? path : null;
 
   const [lastSection, setLastSection] = useState(() => {
     try {
@@ -186,11 +186,15 @@ function BookApp({ book, saveIssue, leader, leaderReady }) {
             <button
               type="button"
               className="chipbtn chipbtn--leader"
-              onClick={() => navigate('/scan')}
-              title={isEn ? 'Leader Mode (Read-Only) — Scan member QR' : '領袖模式（只讀）— 掃描成員二維碼'}
+              onClick={() => navigate('/scan/batch')}
+              title={
+                isEn
+                  ? 'Leader Mode (Read-Only) — All-Members Progress & One-Sign'
+                  : '領袖模式（只讀）— 全團進度與一簽簽發'
+              }
             >
               <Icon name="lock" size={13} />{' '}
-              <span>{isEn ? 'Leader · Read-Only' : '領袖 · 只讀'}</span>
+              <span>{isEn ? 'Leader · Workbench' : '領袖 · 一簽簽發'}</span>
             </button>
           )}
 
@@ -297,7 +301,7 @@ function BookApp({ book, saveIssue, leader, leaderReady }) {
             <PrintBook pages={PAGES} />
           ) : leaderRoute ? (
             leader ? (
-              <Scan hasBook />
+              <Scan hasBook initialTab="batch" />
             ) : (
               <LeaderGate mode="page" />
             )
@@ -310,8 +314,10 @@ function BookApp({ book, saveIssue, leader, leaderReady }) {
               <ScanView />
             ) : scanPath === '/scan/signoff' ? (
               <Signoff />
+            ) : scanPath === '/scan/batch' ? (
+              <Scan hasBook initialTab="batch" />
             ) : (
-              <Scan hasBook />
+              <Scan hasBook initialTab="scan" />
             )
           ) : formId ? (
             formId === 'index' ? (
@@ -334,7 +340,8 @@ function BookApp({ book, saveIssue, leader, leaderReady }) {
               }}
               last={lastMeta}
               onContinue={() => lastMeta && navigate(`/p/${lastMeta.id}`)}
-              onLeader={!leader && leaderReady ? () => navigate('/leader') : null}
+              onLeader={leader ? () => navigate('/scan/batch') : leaderReady ? () => navigate('/leader') : null}
+              leaderActive={leader}
             />
           )}
         </div>
