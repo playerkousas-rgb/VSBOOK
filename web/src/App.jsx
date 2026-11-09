@@ -42,12 +42,17 @@ function BookApp({ book, saveIssue, leader, leaderReady }) {
   const [savedAt, setSavedAt] = useState(null);
   const [online, setOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine));
   const [updateReady, setUpdateReady] = useState(false);
+  const [updateVersion, setUpdateVersion] = useState('');
   const touch = useRef(null);
 
   useEffect(() => {
     const on = () => setOnline(true);
     const off = () => setOnline(false);
-    const up = () => setUpdateReady(true);
+    const up = (e) => {
+      const next = e?.detail?.version || '';
+      if (next) setUpdateVersion(next);
+      setUpdateReady(true);
+    };
     window.addEventListener('online', on);
     window.addEventListener('offline', off);
     window.addEventListener(UPDATE_EVENT, up);
@@ -356,7 +361,10 @@ function BookApp({ book, saveIssue, leader, leaderReady }) {
 
       {updateReady && (
         <div className="updatebar no-print" role="status">
-          <span>{isEn ? 'New version ready' : 'VSBOOK 有新版本可用'}</span>
+          <span>
+            {isEn ? 'New version ready' : 'VSBOOK 有新版本可用'}
+            {updateVersion ? ` · ${updateVersion}` : ''}
+          </span>
           <button type="button" className="btn btn--gold btn--sm" onClick={() => applyPwaUpdate()}>
             {isEn ? 'Reload' : '立即更新'}
           </button>

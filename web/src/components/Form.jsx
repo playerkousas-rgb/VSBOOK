@@ -155,9 +155,10 @@ export function Grid({ cols = 2, children, className = '' }) {
   return <div className={cx('fgrid', `fgrid--${cols}`, className)}>{children}</div>;
 }
 
-export function Sig({ label, en, path, defaultName = '', defaultTitle = '' }) {
+/** 簽署欄只按「姓名」計寬與預填：實際簽署最多只寫名字，不會寫成「陳某某 團長」，故不預填職銜。 */
+export function Sig({ label, en, path, defaultName = '' }) {
   const [value, set] = useField(path, null);
-  return <SignatureBlock label={label} en={en} value={value} onChange={set} defaultName={defaultName} defaultTitle={defaultTitle} />;
+  return <SignatureBlock label={label} en={en} value={value} onChange={set} defaultName={defaultName} />;
 }
 
 /** 紙本「所選項目（請圈出）」互動紅圈選擇器 */
@@ -217,7 +218,7 @@ export function AssessTable({ title, en, items, exempted = false }) {
   };
 
   return (
-    <div className={cx('asstable', exempted && 'is-exempted')}>
+    <div className={cx('asstable', 'asstable--two-row', exempted && 'is-exempted')}>
       {title && (
         <div className="asstable__cat">
           <strong>{isEn && en ? en : title}</strong>
@@ -299,7 +300,6 @@ export function AssessTable({ title, en, items, exempted = false }) {
         onClose={() => setSignItem(null)}
         title={signItem ? `${isEn ? 'Assessor Initials' : '主考簽核'} · (${signItem.no})` : ''}
         defaultName={signItem ? book.progress?.[signItem.id]?.assessor || '' : ''}
-        defaultTitle={isEn ? 'Assessor / VSL' : '主考／團長'}
         onSave={(sig) => {
           if (signItem) {
             setEntry(signItem.id, {
@@ -315,6 +315,41 @@ export function AssessTable({ title, en, items, exempted = false }) {
   );
 }
 
+/**
+ * 依「每欄真實內容最長有幾長」決定欄寬，而非照 PDF 比例：
+ * - 日期欄（原生 date input）下限 118px，確保 YYYY-MM-DD 連日曆鈕完整顯示；
+ * - 名稱／項目欄改用 clamp(下限, 佔闊百分比, 上限) 約佔 38–46%，不再用 minmax(0, 1fr) 獨佔餘下闊度；
+ * - 其餘欄（證書編號、簽署、備註）以 minmax(下限, 比例fr) 攤分，下限保證窄頁不疊字。
+ * 表頭與表身共用同一條 --cols，天然對齊。
+ */
+const DATE_COL_MIN = 124; // 原生 <input type="date"> 顯示 YYYY-MM-DD（約 96px）連日曆鈕，加細胞內距後所需
+const NAME_COL_PCT = 42; // 名稱欄約佔 42%（量度：項目平均 12.4 字、徽章名最長 25 字，不值得佔一半以上）
+/** 由欄位內容長度推下限：中文約 13.5px／全形字，英文數字約 7.6px／字元，另加細胞左右內距 14px。 */
+function minForText(sample = '') {
+  let px = 0;
+  for (const ch of String(sample)) px += /[\u2E80-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/.test(ch) ? 13.5 : 7.6;
+  return Math.ceil(px) + 14;
+}
+function colsTemplate(cols, hasDel = false) {
+  const list = cols.map((c) => {
+    const need = c.min || (c.type === 'date' ? DATE_COL_MIN : 76) || minForText(c.placeholder || c.label || '');
+    return { ...c, min: Math.max(76, need), fr: c.width || 1 };
+  });
+  let nameIdx = -1;
+  list.forEach((c, i) => {
+    if (c.type === 'date') return;
+    if (nameIdx < 0 || c.fr > list[nameIdx].fr) nameIdx = i;
+  });
+  const parts = list.map((c, i) => {
+    if (c.type === 'date') return `minmax(${DATE_COL_MIN}px, ${Math.min(c.fr, 1)}fr)`;
+    // 名稱欄：clamp(下限, 佔闊百分比, 上限) 隨書頁實際闊度伸縮，窄頁不疊字、闊頁不獨霸
+    if (i === nameIdx && !c.fixed) return `clamp(${Math.max(c.min, 132)}px, ${NAME_COL_PCT}%, ${c.max || 300}px)`;
+    return `minmax(${c.min}px, ${c.fr}fr)`;
+  });
+  if (hasDel) parts.push('24px');
+  return parts.join(' ');
+}
+
 /** 紙本表格（預設不顯示自創刪除鍵，手機自動展開為欄名在上、值在下） */
 export function Rows({ path, cols, min = 4, addLabel = null, del = false, dense = false, cap }) {
   const [stored, set] = useField(path, []);
@@ -322,6 +357,7 @@ export function Rows({ path, cols, min = 4, addLabel = null, del = false, dense 
   const { isEn } = useLang();
   const list = Array.isArray(stored) ? stored : [];
   const total = Math.max(min, list.length);
+  const template = colsTemplate(cols, del);
 
   const setCell = (index, key, value) => {
     const next = list.slice();
@@ -334,10 +370,10 @@ export function Rows({ path, cols, min = 4, addLabel = null, del = false, dense 
   const add = () => set([...list, { id: `r_${Math.random().toString(36).slice(2, 8)}` }]);
 
   return (
-    <div className={cx('pgtable', dense && 'pgtable--dense')}>
+    <div className={cx('pgtable', dense && 'pgtable--dense')} style={{ '--cols': template }}>
       <div className={cx('pgtable__head pgtable__row', `pgtable__row--${cols.length}`)}>
         {cols.map((c) => (
-          <span key={c.k} style={c.width ? { flex: c.width } : undefined}>
+          <span key={c.k}>
             {isEn ? c.en || englishOf(c.label) || termFor('en', c.label) : c.label}
             {!isEn && c.en && <em>{c.en}</em>}
           </span>
@@ -352,7 +388,6 @@ export function Rows({ path, cols, min = 4, addLabel = null, del = false, dense 
               className="pgtable__cell"
               key={c.k}
               data-label={isEn ? c.en || englishOf(c.label) || termFor('en', c.label) : c.label}
-              style={c.width ? { flex: c.width } : undefined}
             >
               <Write
                 value={list[index]?.[c.k] ?? ''}

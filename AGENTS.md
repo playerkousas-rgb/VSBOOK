@@ -22,7 +22,7 @@
 2. **單一成員識別碼 `SCOUT ID`**：紀錄冊編號與童軍成員編號統一為 `scoutId`（同步兼容 `memberNo`，淘汰舊 `ymis`），確保與 `vsbadge` v4.0.0 無縫互通。
 3. **紙本頁碼與 2026 第十一版綱要精準對齊**：嚴格維持紙本第 1–40 頁頁序，以及 `FORM PT/65 (8/2026)`、`FORM PT/19 (10/2026)`、`FORM PT/20 (10/2026)` 官方欄位（含香港身份證只填首四位如 `A123` 之私隱保護提示）。
 4. **版權保護（非 MIT）與非官方聲明（W1）**：維持 [`LICENSE`](LICENSE) 之 `Copyright © 2026 SCOUT SYSTEM — All Rights Reserved` 條款，並在封面／附錄／頁尾保留參考 `ROVERBOOK` 之完整中英非官方工具聲明，區分軟件版權（`SCOUT SYSTEM`）與訓練綱要內容版權（`香港童軍總會`）。
-5. **雙重版本號（V）與體積預算（S7 / G11）**：任何可見更新須同步遞增 `package.json`、`web/index.html`（`meta[name="app-version"]`、`window.APP_VERSION` 及頂部 GENERATED 註解）、`shared/book.js`（`APP_VERSION`）及 `CHANGELOG.md`；`dist/` 總體積須 `< 5 MB`（目標 `< 1 MB`），`web/public/icons/` 9 個圖示總和須 `<= 260 KB`。
+5. **四處版本號同步（V）與體積預算（S7 / G11）**：任何可見更新須同步遞增 `package.json`、`web/index.html`（`meta[name="app-version"]`、`window.APP_VERSION` 及頂部 GENERATED 註解）、`shared/book.js`（`APP_VERSION`）、**`web/public/sw.js` 的 `CACHE_NAME`**（如 `vsbook-cache-v1.0.1` → `v1.0.2`）及 `CHANGELOG.md`；只改程式碼不改快取名，已安裝的主畫面 APP 永遠收到舊版面（由 `tests/ui_contracts.test.mjs` 的 PWA 版本守衛把關）。`dist/` 總體積須 `< 5 MB`（目標 `< 1 MB`），`web/public/icons/` 9 個圖示總和須 `<= 260 KB`。
 6. **禁止在 `.js/.mjs/.jsx` 寫 `// v1.0` 行內版本註解（F15）**：版本號只寫在常數、HTML meta 與 `CHANGELOG.md`。
 
 ## 4. 交付前必跑指令

@@ -124,7 +124,7 @@ export function P10() {
           <Line label="宣誓日期" en="Date of Investiture" type="date" path="pages.p10.investitureDate" />
           <Line label="團長姓名" en="Name of Venture Scout Leader" path="pages.p10.vslName" placeholder={book.member?.vsl || '團長姓名'} />
         </Grid>
-        <Sig label="團長簽署" en="Signature of Venture Scout Leader" path="pages.p10.vslSig" defaultName={book.member?.vsl || ''} defaultTitle="深資童軍團長 VSL" />
+        <Sig label="團長簽署" en="Signature of Venture Scout Leader" path="pages.p10.vslSig" defaultName={book.member?.vsl || ''} />
       </div>
     </Page>
   );
@@ -256,7 +256,7 @@ export function P13() {
           <Line label="完成日期" en="Date of Completion" type="date" path="pages.p13.completedDate" />
           <Line label="證書編號" en="Certificate Number" path="pages.p13.certNo" placeholder="肩章證書編號" />
         </Grid>
-        <Sig label="團長簽署" en="Signature of Venture Scout Leader" path="pages.p13.vslSig" defaultName={book.member?.vsl || ''} defaultTitle="深資童軍團長 VSL" />
+        <Sig label="團長簽署" en="Signature of Venture Scout Leader" path="pages.p13.vslSig" defaultName={book.member?.vsl || ''} />
       </div>
     </Page>
   );
@@ -319,7 +319,7 @@ export function P14() {
           <Line label="職位" en="Post" path="pages.p14.assessorPost" />
           <Line label="日期" en="Date" type="date" path="pages.p14.assessorDate" />
         </Grid>
-        <Sig label="主考簽署" en="Signature" path="pages.p14.assessorSig" defaultTitle="主考 Assessor" />
+        <Sig label="主考簽署" en="Signature" path="pages.p14.assessorSig" />
         <Grid cols={2}>
           <Line label="完成日期" en="Date of Completion" type="date" path="pages.p14.completedDate" />
           <Line label="證書編號" en="Certificate Number" path="pages.p14.certNo" placeholder="活動策劃段章證書編號" />
@@ -623,7 +623,7 @@ export function P20() {
           <Line label="完成日期" en="Date of Completion" type="date" path="pages.p20.completedDate" />
           <Line label="證書編號" en="Certificate Number" path="pages.p20.certNo" placeholder="深資童軍獎章證書編號" />
         </Grid>
-        <Sig label="深資童軍團長簽署" en="Signature of Venture Scout Leader" path="pages.p20.vslSig" defaultName={book.member?.vsl || ''} defaultTitle="深資童軍團長 VSL" />
+        <Sig label="深資童軍團長簽署" en="Signature of Venture Scout Leader" path="pages.p20.vslSig" defaultName={book.member?.vsl || ''} />
       </div>
 
       <Bilingual as="h3" className="secsub" zh="由區總監接見" en="Interview with District Commissioner" />
@@ -632,7 +632,7 @@ export function P20() {
         <Line label="姓名" en="Name" path="pages.p20.dcName" placeholder="區總監姓名" />
         <Line label="日期" en="Date" type="date" path="pages.p20.dcDate" />
       </Grid>
-      <Sig label="區總監簽署" en="Signature" path="pages.p20.dcSig" defaultTitle="區總監 DC" />
+      <Sig label="區總監簽署" en="Signature" path="pages.p20.dcSig" />
 
       <div className="formcta">
         <span>{isEn ? 'Ready to submit your Venture Scout Award application?' : '已完成四個段章？可一鍵帶入資料生成申請表：'}</span>
@@ -1009,7 +1009,7 @@ export function P31() {
         <Line label="姓名" en="Name" path="pages.p31.dcName" />
         <Line label="日期" en="Date" type="date" path="pages.p31.dcDate" />
       </Grid>
-      <Sig label="簽署" en="Signature" path="pages.p31.dcSig" defaultTitle="區總監 DC" />
+      <Sig label="簽署" en="Signature" path="pages.p31.dcSig" />
     </Page>
   );
 }
@@ -1024,7 +1024,7 @@ export function P32() {
         <Line label="姓名" en="Name" path="pages.p32.rcName" />
         <Line label="日期" en="Date" type="date" path="pages.p32.rcDate" />
       </Grid>
-      <Sig label="簽署" en="Signature" path="pages.p32.rcSig" defaultTitle="地域總監 RC" />
+      <Sig label="簽署" en="Signature" path="pages.p32.rcSig" />
     </Page>
   );
 }
