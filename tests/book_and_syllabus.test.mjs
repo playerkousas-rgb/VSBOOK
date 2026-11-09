@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs, { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   APP_VERSION,
   BADGE_SYLLABUS,
@@ -18,6 +21,8 @@ import {
   exportForVsBadge,
   importFromVsBadge,
 } from '../shared/book.js';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 test('紙本第 1–40 頁逐頁映射完整無缺漏與重覆', () => {
   assert.equal(PAGE_TOTAL, 40);
@@ -137,5 +142,5 @@ test('與 vsbadge 純進度同步：BOOK 匯出一律為待核實（pending）�
   // 未核實（pending）項目絕不錄入
   assert.equal(res.book.progress['L3-PROJECT-01'], undefined);
   assert.equal(res.book.pages.p34.faCompletedDate, '2026-05-03');
-  assert.equal(APP_VERSION, 'v1.0.0');
+  assert.equal(APP_VERSION, `v${JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version}`);
 });

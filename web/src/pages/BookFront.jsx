@@ -190,7 +190,7 @@ export function P01() {
         </div>
       </details>
 
-      <Sig label="持有人簽署" en="Signature of Holder" path="holderSignature" defaultTitle="深資童軍成員" />
+      <Sig label="持有人簽署" en="Signature of Holder" path="holderSignature" />
     </Page>
   );
 }
@@ -390,7 +390,6 @@ function RenewalRows({ startIndex, count }) {
         onClose={() => setSignIdx(null)}
         title={isEn ? 'Renewal Confirmation Signature' : '會員資格續期 · 團長簽署'}
         defaultName={book.member?.vsl || ''}
-        defaultTitle="深資童軍團長 VSL"
         onSave={(sig) => {
           if (signIdx !== null) {
             const cur = list[signIdx] || {};

@@ -5,7 +5,7 @@ import { BADGE_SYLLABUS, OTHER_BADGES, SYLLABUS_ITEMS, ITEM_INDEX, SYLLABUS_META
 
 export { BADGE_SYLLABUS, OTHER_BADGES, SYLLABUS_ITEMS, ITEM_INDEX, SYLLABUS_META };
 
-export const APP_VERSION = 'v1.0.0';
+export const APP_VERSION = 'v1.0.1';
 export const STORE_KEY = 'vsbook.book.v1';
 export const LEGACY_STORE_KEYS = [];
 
@@ -702,7 +702,8 @@ const SIG_VSL = inkSvg(
   '#5a1321',
 );
 
-const vslSig = (at) => ({ png: SIG_VSL, name: '陳志軒', title: '深資童軍團長 VSL', at });
+/* 示範簽名只放純姓名：實際簽署最多只寫名字，不會寫成「陳某某 團長」 */
+const vslSig = (at) => ({ png: SIG_VSL, name: '陳志軒', at });
 
 export function demoBook() {
   const progress = {};
@@ -753,7 +754,7 @@ export function demoBook() {
       dateJoined: '2025-09-06',
       dateScoutMovement: '2018-10-01',
     },
-    holderSignature: { png: SIG_HOLDER, name: '張芷晴', title: '持有人', at: '2025-09-06' },
+    holderSignature: { png: SIG_HOLDER, name: '張芷晴', at: '2025-09-06' },
     scouting: {
       grasshopper: { from: '2016-09', to: '2018-08', unit: '港島第 28 旅小童軍團', post: '小童軍', award: '金箭章' },
       cub: { from: '2018-09', to: '2021-08', unit: '港島第 28 旅幼童軍團', post: '隊長', award: '金紫荊獎章' },

@@ -199,3 +199,93 @@ test('Favicon SVG, root favicons, manifest icons, and service worker stay aligne
     assert.ok(fs.existsSync(iconFile), `Missing manifest icon ${icon.src}`);
   }
 });
+
+test('表格欄寬按真實內容量度：名稱欄 clamp() 攤分、日期欄下限容得下 YYYY-MM-DD 連日曆鈕', () => {
+  const css = fs.readFileSync(path.join(root, 'web/src/styles.css'), 'utf8');
+
+  // 1. 名稱欄不得以 minmax(0, 1fr) 獨佔餘下全部闊度
+  assert.ok(
+    !/\.asstable__head,\s*\n\.assrow\s*\{[^}]*minmax\(0,\s*1fr\)/.test(css),
+    'assrow 名稱欄不得用 minmax(0, 1fr) 獨佔餘下闊度',
+  );
+
+  // 2. 名稱欄用 clamp(下限, 佔闊百分比, 上限)
+  const assCols = /\.asstable__head,\s*\n\.assrow\s*\{[^}]*grid-template-columns:\s*([^;]+);/.exec(css);
+  assert.ok(assCols, 'assrow 必須有 grid-template-columns');
+  assert.match(assCols[1], /clamp\(\s*\d+px\s*,\s*\d+%\s*,\s*\d+px\s*\)/, '名稱欄必須用 clamp(下限, 百分比, 上限)');
+
+  // 3. 日期欄下限 >= 118px（原生日期輸入連日曆鈕所需）
+  const dateMins = [...assCols[1].matchAll(/minmax\((\d+)px/g)].map((m) => Number(m[1]));
+  assert.ok(Math.max(...dateMins) >= 118, `日期欄下限須 >= 118px，實得 ${Math.max(...dateMins)}px`);
+
+  // 4. 續期表同樣用 grid 而非 flex:1（曾令日期欄被壓至 58–82px）
+  const renew = /\.renewtable__head,\s*\n\.renewrow\s*\{[^}]*grid-template-columns:\s*([^;]+);/.exec(css);
+  assert.ok(renew, 'renewrow 必須用 grid-template-columns');
+  assert.ok(
+    [...renew[1].matchAll(/minmax\((\d+)px/g)].every((m) => Number(m[1]) >= 118),
+    '續期表兩個日期欄下限須 >= 118px',
+  );
+
+  // 5. 表頭與表身共用同一套欄寬
+  assert.match(css, /\.asstable__head,\s*\n\.assrow\s*\{\s*\n\s*display:\s*grid/, '表頭與表身必須共用同一組 grid-template-columns');
+  assert.match(css, /\.pgtable__head,\s*\n\.asstable__head,\s*\n\.renewtable__head/, '三種表格表頭須共用樣式');
+
+  // 6. 不可用 container-type / container query 量度頁面闊度（會困住 position: fixed 彈窗）
+  assert.ok(!/container-type\s*:/.test(css), '禁止 container-type —— 會令簽署彈窗被困在書頁內');
+  assert.ok(!/@container\b/.test(css), '禁止 @container 查詢');
+});
+
+test('簽名圖同時限寬限高，窄欄不顯示會遮字的浮動小按鈕', () => {
+  const css = fs.readFileSync(path.join(root, 'web/src/styles.css'), 'utf8');
+  for (const sel of ['.assrow__sigbtn img', '.renewrow__sigarea img', '.sigblock__preview img', '.signoffsig img']) {
+    const re = new RegExp(`${sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{[^}]*\\}`);
+    const rule = re.exec(css);
+    assert.ok(rule, `${sel} 必須有樣式規則`);
+    assert.match(rule[0], /max-width:\s*100%/, `${sel} 必須限寬 max-width: 100%`);
+    assert.match(rule[0], /max-height:/, `${sel} 必須限高`);
+  }
+  const zoomHide = /\.assrow__date \.write__zoom,\s*\n\.assrow__init \.write__zoom,\s*\n\.pgtable__cell \.write__zoom/.exec(css);
+  assert.ok(zoomHide, '窄欄（主考／日期／表格細胞）不得顯示浮動放大鈕');
+});
+
+test('簽署視窗不預填職銜，示範資料只放純姓名', () => {
+  const files = [
+    'web/src/pages/BookFront.jsx',
+    'web/src/pages/BookTraining.jsx',
+    'web/src/components/Form.jsx',
+    'web/src/components/SignoffPanel.jsx',
+  ];
+  for (const rel of files) {
+    const src = fs.readFileSync(path.join(root, rel), 'utf8');
+    assert.ok(!/defaultTitle=/.test(src), `${rel} 不得再預填職銜（defaultTitle）`);
+  }
+  const bookSrc = fs.readFileSync(path.join(root, 'shared/book.js'), 'utf8');
+  assert.ok(!/const vslSig = \(at\) => \(\{[^}]*title:/.test(bookSrc), '示範簽名只放純姓名，不放職銜');
+});
+
+test('PWA 四處版本號同步，並具備主動查更新、更新提示與自動重載', () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+  const bookSrc = fs.readFileSync(path.join(root, 'shared/book.js'), 'utf8');
+  const html = fs.readFileSync(path.join(root, 'web/index.html'), 'utf8');
+  const sw = fs.readFileSync(path.join(root, 'web/public/sw.js'), 'utf8');
+
+  // 1. 四處版本號必須一致：package.json / APP_VERSION / index.html meta / SW 快取名
+  const appVer = /export const APP_VERSION = '([^']+)'/.exec(bookSrc)?.[1];
+  assert.equal(appVer, `v${pkg.version}`, 'shared/book.js APP_VERSION 必須等於 package.json version');
+  assert.ok(html.includes(`<meta name="app-version" content="${appVer}" />`), 'index.html meta app-version 必須同步');
+  const cacheName = /const CACHE_NAME = '([^']+)'/.exec(sw)?.[1] || '';
+  assert.ok(cacheName.includes(appVer), `SW 快取名須含版本號（現為 ${cacheName}），否則已安裝 APP 永遠收到舊版面`);
+
+  // 2. 主動查更新：切回前景即 reg.update()
+  assert.match(sw, /SKIP_WAITING/, 'SW 必須處理 SKIP_WAITING 訊息');
+  const pwa = fs.readFileSync(path.join(root, 'web/src/pwa.js'), 'utf8');
+  assert.match(pwa, /addEventListener\('visibilitychange'/, '必須註冊 visibilitychange 主動查更新');
+  assert.match(pwa, /reg\.update\(\)/, '切回前景必須呼叫 reg.update()');
+  assert.match(pwa, /controllerchange/, '必須監聽 controllerchange 自動重載');
+  assert.match(pwa, /location\.reload\(\)/, 'controllerchange 後必須自動 location.reload()');
+
+  // 3. 偵測到新版要彈出提示，按鈕送出 SKIP_WAITING
+  const appSrc = fs.readFileSync(path.join(root, 'web/src/App.jsx'), 'utf8');
+  assert.match(appSrc, /className="updatebar no-print"/, 'App.jsx 必須顯示更新提示');
+  assert.match(pwa, /postMessage\(\{\s*type:\s*'SKIP_WAITING'\s*\}\)/, '按下更新必須 postMessage SKIP_WAITING');
+});

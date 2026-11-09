@@ -222,10 +222,12 @@ code {
 
 .stage__inner { width: min(760px, 100%); }
 
-/* 內頁闊度跟隨視窗高度收窄，令整張 A4 一眼見晒 */
+/* 內頁闊度跟隨視窗高度收窄，令整張 A4 一眼見晒；
+   但設 560px 下限，避免矮而闊的螢幕（如 1024×700）把書頁壓成 376px
+   而令三欄簽核表的日期欄被迫疊字。 */
 .stage__inner--page {
-  width: min(760px, calc((100vh - 178px) * 0.72), 100%);
-  width: min(760px, calc((100dvh - 178px) * 0.72), 100%);
+  width: min(760px, max(560px, calc((100vh - 178px) * 0.72)), 100%);
+  width: min(760px, max(560px, calc((100dvh - 178px) * 0.72)), 100%);
 }
 .stage__inner--forms { width: min(860px, 100%); }
 .stage__inner--scan { width: min(680px, 100%); }
@@ -904,6 +906,7 @@ html[data-lang="zh"] .awardart__cap em {
 textarea.write__input { min-height: calc(var(--rows, 2) * 24px - 4px); line-height: 24px; }
 
 .write__ink {
+  max-width: 100%;
   max-height: 36px;
   width: auto;
   object-fit: contain;
@@ -930,6 +933,14 @@ textarea.write__input { min-height: calc(var(--rows, 2) * 24px - 4px); line-heig
   .write__zoom { opacity: 0.55; }
 }
 
+/* 窄欄不放會遮住文字的浮動小按鈕：改為只在雙擊／長按開啟放大編輯 */
+.assrow__date .write__zoom,
+.assrow__init .write__zoom,
+.pgtable__cell .write__zoom,
+.write--compact .write__zoom {
+  display: none;
+}
+
 .write--date { padding-right: 2px; position: relative; }
 .write__date {
   border: 0;
@@ -941,6 +952,12 @@ textarea.write__input { min-height: calc(var(--rows, 2) * 24px - 4px); line-heig
   padding: 0;
   min-height: 22px;
 }
+/* 日期欄只留 2px 內距，餘下全部闊度交還原生日期輸入，
+   確保 YYYY-MM-DD（約 96px）連日曆選擇鈕在任何寬度都不被裁切。
+   用 .write.write--date 提高權重，避免被後段 .write 的 16px 右內距蓋過。 */
+.write.write--date { padding-right: 2px; padding-left: 1px; }
+.write--date .write__date { padding-right: 0; width: 100%; }
+
 /* 空白日期欄同樣只顯示小圓圈，點擊即彈出日期選擇器 */
 .write--date.is-empty {
   justify-content: flex-start;
@@ -1003,14 +1020,15 @@ textarea.write__input { min-height: calc(var(--rows, 2) * 24px - 4px); line-heig
   overflow: hidden;
   background: rgba(255, 255, 255, 0.34);
 }
+/* 表頭與表身共用同一套欄寬（由 Rows 依真實內容長度以 min()/minmax() 產生 --cols） */
 .pgtable__row {
-  display: flex;
+  display: grid;
+  grid-template-columns: var(--cols, minmax(96px, 2fr) minmax(76px, 1fr) minmax(118px, 1.1fr));
   align-items: stretch;
   border-bottom: 1px solid var(--paper-dot);
 }
 .pgtable__row:last-of-type { border-bottom: 0; }
 .pgtable__row > span {
-  flex: 1;
   min-width: 0;
   padding: 4px 7px;
   border-right: 1px solid var(--paper-dot);
@@ -1088,10 +1106,17 @@ textarea.write__input { min-height: calc(var(--rows, 2) * 24px - 4px); line-heig
   color: var(--ok);
 }
 
+/* 表頭與表身共用同一套欄寬（量度實據：項目平均 12.4 字、最長 34 字；
+   主考姓名最長 3 字、日期固定 10 位數字）。
+   項目欄 clamp(下限, 佔闊 44%, 上限) 隨書頁伸縮，餘下闊度按比例還給主考及日期，
+   日期欄下限 118px 足以完整顯示 YYYY-MM-DD 連日曆選擇鈕。 */
 .asstable__head,
 .assrow {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 128px 118px;
+  grid-template-columns:
+    clamp(148px, 43%, 300px)
+    minmax(78px, 1.02fr)
+    minmax(124px, 1fr);
   align-items: stretch;
 }
 .asstable__head {
@@ -1154,7 +1179,7 @@ textarea.write__input { min-height: calc(var(--rows, 2) * 24px - 4px); line-heig
   max-width: 100%;
   padding: 1px 3px;
 }
-.assrow__sigbtn img { max-height: 24px; width: auto; object-fit: contain; }
+.assrow__sigbtn img { max-width: 100%; max-height: 24px; width: auto; object-fit: contain; }
 .assrow__sigbtn small { font-size: 10px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* 「所選項目（請圈出）」互動紅圈選擇器 */
@@ -1349,9 +1374,12 @@ textarea.write__input { min-height: calc(var(--rows, 2) * 24px - 4px); line-heig
   background: rgba(255, 255, 255, 0.34);
   overflow: hidden;
 }
+/* 表頭與表身共用同一套欄寬：日期兩欄各 118px 下限（完整 YYYY-MM-DD 連日曆鈕），
+   旅印及簽署欄取餘下闊度，不再用 flex:1 令日期被壓至 58–82px 而疊字。 */
 .renewtable__head,
 .renewrow {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(122px, 1fr) minmax(122px, 1fr) minmax(150px, 2.1fr);
   align-items: stretch;
   border-bottom: 1px solid var(--paper-dot);
 }
@@ -1365,7 +1393,7 @@ textarea.write__input { min-height: calc(var(--rows, 2) * 24px - 4px); line-heig
 }
 .renewtable__head > span,
 .renewrow__cell {
-  flex: 1;
+  min-width: 0;
   padding: 6px 8px;
   border-right: 1px solid var(--paper-dot);
   display: flex;
@@ -1376,10 +1404,14 @@ textarea.write__input { min-height: calc(var(--rows, 2) * 24px - 4px); line-heig
 .renewrow__sigarea {
   display: flex;
   align-items: center;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 4px 8px;
   width: 100%;
 }
-.renewrow__sigarea img { max-height: 40px; width: auto; cursor: pointer; }
+/* 旅印及簽署欄較窄時，備註欄自動換到第二行，不再被壓成 10px 闊而逐字斷行 */
+.renewrow__sigarea .write { flex: 1 1 96px; min-width: 96px; }
+.renewrow__sigarea .linkbtn { flex: 0 0 auto; }
+.renewrow__sigarea img { max-width: 100%; max-height: 40px; width: auto; object-fit: contain; cursor: pointer; }
 .linkbtn {
   display: inline-flex;
   align-items: center;
@@ -1527,7 +1559,7 @@ textarea.write__input { min-height: calc(var(--rows, 2) * 24px - 4px); line-heig
 }
 .sigblock__empty:hover { border-color: var(--vs-red); color: var(--vs-red); background: rgba(122, 20, 38, 0.04); }
 .sigblock__preview { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.sigblock__preview img { max-height: 46px; width: auto; object-fit: contain; }
+.sigblock__preview img { max-width: 100%; max-height: 46px; width: auto; object-fit: contain; }
 .sigmeta { font-size: 11px; color: var(--ink-2); display: flex; flex-direction: column; }
 .sigblock__actions { display: inline-flex; gap: 6px; }
 
@@ -2133,7 +2165,7 @@ textarea.write__input { min-height: calc(var(--rows, 2) * 24px - 4px); line-heig
 .signpanel__hint { font-size: 12px; color: var(--ink-2); margin: 0; }
 
 .signofflist { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
-.signoffsig img { max-height: 54px; width: auto; }
+.signoffsig img { max-width: 100%; max-height: 54px; width: auto; object-fit: contain; }
 .signoffactions { display: flex; flex-wrap: wrap; gap: 8px; }
 .signoffdone { padding: 10px 12px; border-radius: 8px; background: rgba(31, 92, 58, 0.1); color: var(--ok); font-weight: 600; }
 
@@ -2290,7 +2322,14 @@ textarea.write__input { min-height: calc(var(--rows, 2) * 24px - 4px); line-heig
 .ptcell__lbl em { font-style: normal; font-weight: 400; color: #666; margin-left: 3px; }
 .ptcell__val .write { border-bottom: 0; min-height: 22px; }
 
-.pttable { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+/* PT/65 四欄考驗表：欄寬按真實內容（段章名最長 10 字、日期固定 10 位數字），
+   不照 PDF 比例。日期欄下限 118px 保證 YYYY-MM-DD 連日曆鈕完整顯示。 */
+.pttable { width: 100%; border-collapse: collapse; font-size: 11.5px; table-layout: fixed; }
+.pttable .ptc-badge { width: 21%; }
+.pttable .ptc-date { width: 118px; }
+.pttable .ptc-tick { width: 62px; }
+.pttable .write { min-width: 0; }
+.pttable td .write--date { padding-right: 2px; }
 .pttable th, .pttable td { border: 1px solid #888; padding: 4px 7px; text-align: left; vertical-align: middle; }
 .pttable th { background: #f2f2f2; font-family: var(--serif); font-weight: 700; }
 .pttable td .write { border-bottom: 0; }
@@ -2441,6 +2480,7 @@ html[data-print-preview] .write--multi.is-empty {
   /* 紙本表格手機直向展開（欄名在左／上、填寫欄在右／下） */
   .pgtable__head { display: none; }
   .pgtable__row {
+    display: flex;
     flex-direction: column;
     padding: 6px 8px;
     gap: 4px;
@@ -2464,7 +2504,7 @@ html[data-print-preview] .write--multi.is-empty {
   /* 會員章／肩章簽核表手機展開 */
   .asstable__head { display: none; }
   .assrow {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     padding: 6px 8px;
     gap: 4px 10px;
   }
@@ -2490,7 +2530,7 @@ html[data-print-preview] .write--multi.is-empty {
 
   /* 續期表手機展開 */
   .renewtable__head { display: none; }
-  .renewrow { flex-direction: column; padding: 6px 8px; gap: 4px; }
+  .renewrow { display: flex; flex-direction: column; padding: 6px 8px; gap: 4px; }
   .renewrow__cell { border-right: 0; padding: 2px 0; gap: 8px; }
   .renewrow__cell::before {
     content: attr(data-label);
@@ -3374,6 +3414,40 @@ html[data-print-preview] .write--multi.is-empty {
 .renewrow__cell {
   border-right: 0;
   background: transparent;
+}
+
+/* ==========================================================================
+   達下限即轉「兩行制」（不再硬擠）：項目全寬一行、主考＋日期並排下一行
+   只在書頁窄於斷點時生效；表頭同步隱藏，改以 data-label 顯示欄名。
+   ========================================================================== */
+@media (max-width: 1180px) {
+  .asstable--two-row .asstable__head { display: none; }
+  .asstable--two-row .assrow {
+    grid-template-columns: minmax(130px, 1fr) minmax(118px, 1fr);
+    row-gap: 4px;
+    padding: 6px 8px;
+  }
+  .asstable--two-row .assrow__item {
+    grid-column: 1 / -1;
+    border-right: 0;
+    padding: 2px 0;
+  }
+  .asstable--two-row .assrow__init,
+  .asstable--two-row .assrow__date {
+    border-right: 0;
+    padding: 2px 0;
+    gap: 6px;
+  }
+  .asstable--two-row .assrow__init::before,
+  .asstable--two-row .assrow__date::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    font-family: var(--serif);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ink-3);
+    white-space: nowrap;
+  }
 }
 
 /* 豁免、或、頒章簽署、圈選框、簽名欄：全部貼合紙面，不浮起白盒 */

@@ -1,6 +1,31 @@
 # CHANGELOG.md — 版本變更紀錄
 
-本專案採用語義化版本（Semantic Versioning），每次更新同步對齊 `package.json`、`shared/book.js` 及 `web/index.html`。
+本專案採用語意化版本（Semantic Versioning），每次更新同步遞增四處版本號：`package.json`、`shared/book.js`（`APP_VERSION`）、`web/index.html`（`meta[name="app-version"]`）及 **Service Worker 快取名**（`web/public/sw.js` 的 `CACHE_NAME`）。只改程式碼不改快取名，已安裝的 APP 會永遠收到舊版面。
+
+## [v1.0.1] — 2026-11-09
+
+### 修正（Fixed）
+- **表格欄寬改按「每欄真實內容有幾長」量度，不再照 PDF 比例**：
+  - 先量度全書內容實據：訓練綱要項目平均 `12.4` 字（最長 `34` 字）、徽章名最長 `25` 字、範疇名最長 `10` 字、主考姓名最長 `3` 字、日期固定 `10` 位數字、證書編號最長 `13` 字元。
+  - **名稱／項目欄**不再以 `minmax(0, 1fr)` 獨佔餘下全部闊度，改用 `clamp(下限, 43–44%, 上限)` 攤分；騰出的闊度還給主考姓名、證書編號、日期及簽署欄。
+  - **日期欄下限提升至 `124px`**（原生日期輸入約需 `96px` 顯示 `YYYY-MM-DD`，加日曆選擇鈕及細胞內距），並將 `.write--date` 右內距由 `16px` 收至 `2px`，杜絕 `10/18/2025` 被裁成 `10/18/202` 或疊字。
+  - **簽署欄只按「姓名」計寬**：移除全部 `defaultTitle` 職銜預填（`Sig`／`SignModal`／`SignoffPanel`／續期簽署），`shared/transfer.js` 核簽碼不再自動補「深資童軍團長 VSL」，示範資料的簽名只放純姓名。
+  - **表頭與表身共用同一套** `grid-template-columns`：`.asstable`／`.pgtable`（由 `Rows` 依內容長度產生 `--cols`）／`.renewtable` 三種表格一律以同一條欄寬軌道排版；CUBBOOK 曾出現「表頭 128px、表身 92px」的錯位已不復存在。
+  - **達下限即改「兩行制」**：書頁窄於 `1180px` 時，項目佔全寬一行，主考＋日期並排下一行，不再硬擠疊字。
+  - **簽名圖同時限寬限高**（`max-width: 100%` + `max-height`）：`.assrow__sigbtn img`、`.renewrow__sigarea img`、`.sigblock__preview img`、`.signoffsig img`、`.write__ink` 全部補上 `max-width`，杜絕只限高令墨跡越出欄外壓住鄰欄。
+  - **窄欄不顯示會遮字的浮動小按鈕**：`.assrow__init`／`.assrow__date`／`.pgtable__cell`／`.write--compact` 內的 `.write__zoom` 一律隱藏。
+  - **續期表（第 4–5 頁）改為 grid 三欄**：原本 `flex: 1` 令日期欄被壓至 `58–82px`、旅印欄暴升至 `265px` 高、備註被壓成 `10px` 闊逐字斷行；現為「日期 122px 下限／有效日期 122px 下限／旅印及簽署取餘下」，並讓備註欄自動換行。
+  - **PT/65 考驗表**改用 `table-layout: fixed` + 內容導向欄寬（段章 `21%`、日期欄 `118px`），修復 `390px` 手機上 `518px` 水平溢位。
+  - **內頁闊度加 `560px` 下限**：矮而闊的螢幕（如 `1024×700`）原本把書頁壓成 `376px`，令三欄簽核表被迫疊字；現最少保持 `560px`。
+  - 確認全站**零** `container-type` / `@container`：頁內簽署及放大填寫彈窗保持全螢幕 `position: fixed`，不會被困在書頁內破版。
+  - **實測結果**（headless Chromium 全 42 頁 × `1440×900`／`1024×700`／`390×844`）：水平溢位 `0` 頁、日期欄裁切 `0` 處、內容溢出 `0` 處、小於 `9.5px` 的縮字 `0` 處。
+
+- **已安裝 APP 自動更新**：
+  - Service Worker 快取名改為綁定版號（`vsbook-cache-v1.0.1`），發版時四處版本號（`package.json`、`APP_VERSION`、`index.html` meta、SW 快取名）一併遞增，並新增測試守衛，防止只改程式碼不改快取名而令用戶永遠收到舊版面。
+  - 補齊主動查更新：`visibilitychange`（切回前景）、`focus`、`online` 及每 30 分鐘定時呼叫 `reg.update()`。
+  - 更新提示會顯示即將安裝的版號（如「VSBOOK 有新版本可用 · v1.0.2」）；按下即 `postMessage({type:'SKIP_WAITING'})`，`controllerchange` 時自動 `location.reload()`，並加 3 秒保險重載。
+  - 修正首次安裝時 `clients.claim()` 觸發的無謂重載（只在真正版本交替時重載）。
+  - **驗收實測**：舊版 `v1.0.1` 開啟 → 部署 `v1.0.2` → 切背景再切回 → 出現更新提示 → 按下 → 自動重載至 `v1.0.2`，舊快取自動清除，全程無需刪除或重裝 APP。
 
 ## [v1.0.0] — 2026-11-04
 

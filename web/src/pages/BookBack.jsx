@@ -194,7 +194,7 @@ export function P36() {
         addLabel={null}
         cols={[
           { k: 'badge', label: '獎章', en: 'Badge', width: 2 },
-          { k: 'certNo', label: '證書編號', en: 'Certificate Number', width: 1.3 },
+          { k: 'certNo', label: '證書編號', en: 'Certificate Number', width: 1.3, min: 112 },
           { k: 'date', label: '完成日期', en: 'Date of Completion', type: 'date', width: 1.1 },
         ]}
       />
@@ -214,7 +214,7 @@ export function P37() {
         addLabel={null}
         cols={[
           { k: 'badge', label: '獎章', en: 'Badge', width: 2 },
-          { k: 'certNo', label: '證書編號', en: 'Certificate Number', width: 1.3 },
+          { k: 'certNo', label: '證書編號', en: 'Certificate Number', width: 1.3, min: 112 },
           { k: 'date', label: '完成日期', en: 'Date of Completion', type: 'date', width: 1.1 },
         ]}
       />
@@ -233,7 +233,7 @@ export function P38() {
         addLabel={null}
         cols={[
           { k: 'badge', label: '獎章', en: 'Badge', width: 2 },
-          { k: 'certNo', label: '證書編號', en: 'Certificate Number', width: 1.3 },
+          { k: 'certNo', label: '證書編號', en: 'Certificate Number', width: 1.3, min: 112 },
           { k: 'date', label: '完成日期', en: 'Date of Completion', type: 'date', width: 1.1 },
         ]}
       />
@@ -254,7 +254,7 @@ export function P39() {
         dense
         addLabel={null}
         cols={[
-          { k: 'period', label: '時段', en: 'Period', width: 1.1, placeholder: '2026-01 至 2026-09' },
+          { k: 'period', label: '時段', en: 'Period', width: 1.1, min: 126, placeholder: '2026-01 至 2026-09' },
           { k: 'item', label: '項目', en: 'Items', width: 1.4, placeholder: '執委會職位／活動名稱' },
           { k: 'desc', label: '描述', en: 'Descriptions', width: 2.2, rows: 2 },
         ]}
@@ -276,7 +276,7 @@ export function P40() {
         dense
         addLabel={null}
         cols={[
-          { k: 'period', label: '時段', en: 'Period', width: 1.1, placeholder: '2026-08-21 至 08-23' },
+          { k: 'period', label: '時段', en: 'Period', width: 1.1, min: 126, placeholder: '2026-08-21 至 08-23' },
           { k: 'item', label: '項目', en: 'Items', width: 1.4, placeholder: '遠足路線／海外活動' },
           { k: 'desc', label: '描述', en: 'Descriptions', width: 2.2, rows: 2 },
         ]}

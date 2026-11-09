@@ -165,10 +165,10 @@ function FormPT65() {
       <table className="pttable">
         <thead>
           <tr>
-            <th style={{ width: '18%' }}>段章 Badges</th>
+            <th className="ptc-badge">段章 Badges</th>
             <th>所選擇考驗之內容 Assessment Details</th>
-            <th style={{ width: '15%' }}>由 From</th>
-            <th style={{ width: '15%' }}>至 To</th>
+            <th className="ptc-date">由 From</th>
+            <th className="ptc-date">至 To</th>
           </tr>
         </thead>
         <tbody>
@@ -209,10 +209,10 @@ function FormPT65() {
       <table className="pttable">
         <thead>
           <tr>
-            <th style={{ width: '18%' }}>金帶 Bars</th>
+            <th className="ptc-badge">金帶 Bars</th>
             <th>所選擇考驗之內容 Assessment Details</th>
-            <th style={{ width: '15%' }}>由 From</th>
-            <th style={{ width: '15%' }}>至 To</th>
+            <th className="ptc-date">由 From</th>
+            <th className="ptc-date">至 To</th>
           </tr>
         </thead>
         <tbody>
@@ -402,10 +402,10 @@ function ChecklistPage({ code, list, formId }) {
         <thead>
           <tr>
             <th>證明文件 Documentary Evidence</th>
-            <th style={{ width: '11%' }}>申請人 Applicant</th>
-            <th style={{ width: '9%' }}>區 District</th>
-            <th style={{ width: '9%' }}>地域 Region</th>
-            <th style={{ width: '9%' }}>總會 AHQ</th>
+            <th className="ptc-tick">申請人 Applicant</th>
+            <th className="ptc-tick">區 District</th>
+            <th className="ptc-tick">地域 Region</th>
+            <th className="ptc-tick">總會 AHQ</th>
           </tr>
         </thead>
         <tbody>
@@ -501,9 +501,9 @@ function FormPT19() {
         <table className="pttable">
           <thead>
             <tr>
-              <th style={{ width: '20%' }}>段章 Badges</th>
+              <th className="ptc-badge">段章 Badges</th>
               <th>所選擇考驗之內容 Assessment Details</th>
-              <th style={{ width: '18%' }}>完成日期 Date of Completion</th>
+              <th className="ptc-date">完成日期 Date of Completion</th>
             </tr>
           </thead>
           <tbody>
@@ -598,9 +598,9 @@ function FormPT20() {
         <table className="pttable">
           <thead>
             <tr>
-              <th style={{ width: '22%' }}>金帶 Bars</th>
+              <th className="ptc-badge">金帶 Bars</th>
               <th>所選擇考驗之內容 Assessment Details</th>
-              <th style={{ width: '18%' }}>完成日期 Date of Completion</th>
+              <th className="ptc-date">完成日期 Date of Completion</th>
             </tr>
           </thead>
           <tbody>

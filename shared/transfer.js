@@ -266,7 +266,7 @@ export async function encodeSignoff({ member, leader, items, note }) {
     },
     leader: {
       name: leader?.name || '',
-      title: leader?.title || '深資童軍團長 VSL',
+      title: leader?.title || '',
       at: leader?.at || new Date().toISOString().slice(0, 10),
       png: leader?.png || null,
     },
