@@ -289,3 +289,53 @@ test('PWA 四處版本號同步，並具備主動查更新、更新提示與自�
   assert.match(appSrc, /className="updatebar no-print"/, 'App.jsx 必須顯示更新提示');
   assert.match(pwa, /postMessage\(\{\s*type:\s*'SKIP_WAITING'\s*\}\)/, '按下更新必須 postMessage SKIP_WAITING');
 });
+
+test('BADGE progress-file controls require an authenticated session; BOOK backups remain separate and offline', () => {
+  const card = fs.readFileSync(path.join(root, 'web/src/components/VsBadgeSyncCard.jsx'), 'utf8');
+  assert.match(card, /const hasBadgeSession = Boolean\(session\?\.token && session\?\.ymis\)/);
+  assert.match(card, /\{hasBadgeSession \? \([\s\S]*?onClick=\{onExportFile\}[\s\S]*?onChange=\{onImportFile\}/);
+  assert.match(card, /vsbsync__locked/);
+  assert.match(card, /下方「完整備份 JSON／還原備份 JSON」仍可完全離線使用/);
+  assert.match(card, /const onExportFile = \(\) => \{\s*if \(!session\?\.token \|\| !session\?\.ymis\)/);
+  assert.match(card, /const onImportFile = \(e\) => \{\s*if \(!session\?\.token \|\| !session\?\.ymis\)/);
+  assert.doesNotMatch(card, /未連接[\s\S]{0,30}仍可用下方 JSON 檔與領袖交換進度/);
+
+  const welcome = fs.readFileSync(path.join(root, 'web/src/pages/Welcome.jsx'), 'utf8');
+  assert.match(welcome, /data\?\.member[\s\S]{0,100}data\?\.pages/);
+  assert.match(welcome, /BADGE 進度檔不能在此還原[\s\S]*數位附錄/);
+  assert.doesNotMatch(welcome, /importFromVsBadge/);
+
+  const menu = fs.readFileSync(path.join(root, 'web/src/components/MenuDialog.jsx'), 'utf8');
+  assert.doesNotMatch(menu, /importBadge|importFromVsBadge|vsRef/);
+  assert.match(menu, /Number\(data\?\.version\) === 1[\s\S]*data\?\.member[\s\S]*data\?\.pages/);
+});
+
+test('BADGE troop selection, conditional onboarding links, refresh/manual fallback, icons and print behavior are contracted', () => {
+  const card = fs.readFileSync(path.join(root, 'web/src/components/VsBadgeSyncCard.jsx'), 'utf8');
+  assert.match(card, /upstreamOk/);
+  assert.match(card, /已自動讀取 \$\{troopEntries\.length\} 個 BADGE 已登記旅團/);
+  assert.match(card, /value="__NOT_FOUND__"/);
+  assert.match(card, /troopEntries\.length === 0/);
+  assert.match(card, /重新讀取旅團清單/);
+  assert.match(card, /手動輸入旅團編號/);
+  assert.match(card, /troopId !== '__NOT_FOUND__'[\s\S]*?BADGE 密碼/);
+  assert.match(card, /target="_blank" rel="noopener noreferrer"/);
+  assert.match(card, /href=\{badgeOrigin\}/);
+
+  const ui = fs.readFileSync(path.join(root, 'web/src/ui.jsx'), 'utf8');
+  assert.match(ui, /refresh:/);
+  assert.match(ui, /external:/);
+  const css = fs.readFileSync(path.join(root, 'web/src/styles.css'), 'utf8');
+  for (const selector of ['.vsbsync__locked', '.vsbsync__notfound', '.vsbsync__refresh']) assert.ok(css.includes(selector));
+  assert.match(css, /@media print[\s\S]*?\.vsbsync__locked,[\s\S]*?display: none !important/);
+  assert.match(css, /\.vsbsync__locked[\s\S]*?background: #f7f2e7[\s\S]*?color: #1e1a14/);
+});
+
+test('BADGE bridge origin is documented consistently in deployment configuration', () => {
+  const api = fs.readFileSync(path.join(root, 'api/vsbadge.js'), 'utf8');
+  const env = fs.readFileSync(path.join(root, '.env.example'), 'utf8');
+  const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
+  for (const text of [api, env, readme]) assert.ok(text.includes('https://vsbadge.vercel.app'));
+  assert.ok(env.includes('VSBADGE_ORIGIN=https://vsbadge.vercel.app'));
+  assert.ok(readme.includes('`VSBADGE_ORIGIN`'));
+});

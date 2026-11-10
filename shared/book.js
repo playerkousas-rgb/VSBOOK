@@ -5,7 +5,7 @@ import { BADGE_SYLLABUS, OTHER_BADGES, SYLLABUS_ITEMS, ITEM_INDEX, SYLLABUS_META
 
 export { BADGE_SYLLABUS, OTHER_BADGES, SYLLABUS_ITEMS, ITEM_INDEX, SYLLABUS_META };
 
-export const APP_VERSION = 'v1.0.1';
+export const APP_VERSION = 'v1.0.2';
 export const STORE_KEY = 'vsbook.book.v1';
 export const LEGACY_STORE_KEYS = [];
 

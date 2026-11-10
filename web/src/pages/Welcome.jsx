@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { useToast, Crest, Icon } from '../ui.jsx';
-import { demoBook, importFromVsBadge, newBook } from '@shared/book.js';
+import { demoBook, newBook } from '@shared/book.js';
 import { persistBook } from '../bookStore.js';
 import { navigate } from '../router.jsx';
 import { useLang } from '../i18n.jsx';
@@ -39,20 +39,33 @@ export default function Welcome({ onReady, onLeader }) {
     reader.onload = () => {
       try {
         const data = JSON.parse(String(reader.result));
-        if (data?.member && data?.pages) {
+        const badgeMarkers = data && typeof data === 'object' && (
+          String(data.schema || '').toLowerCase().includes('vsbadge') ||
+          Array.isArray(data.members) || Array.isArray(data.pendingRequests) ||
+          Boolean(data.otherBadges || data.flatProgress)
+        );
+        const isBookBackup = !badgeMarkers && Number(data?.version) === 1 &&
+          data?.member && typeof data.member === 'object' && data?.pages && typeof data.pages === 'object';
+        if (isBookBackup) {
           start(newBook(data), '/p/contents');
           push(isEn ? 'Backup restored' : '備份已還原');
           return;
         }
-        if (data?.progress || Array.isArray(data?.members) || data?.schema?.includes('vsbadge')) {
-          const draft = newBook();
-          const res = importFromVsBadge(data, draft);
-          draft.member = res.member;
-          start(newBook(draft), '/p/contents');
-          push(isEn ? `Imported ${res.imported} items from vsbadge` : `已從 vsbadge 匯入 ${res.imported} 項進度`);
+        const isBadgeProgress = data && typeof data === 'object' && (
+          String(data.schema || '').toLowerCase().includes('vsbadge') ||
+          Array.isArray(data.members) || Array.isArray(data.pendingRequests) ||
+          Boolean(data.progress || data.otherBadges || data.flatProgress)
+        );
+        if (isBadgeProgress) {
+          push(
+            isEn
+              ? 'Open or create your BOOK first, then connect and sign in to BADGE in the Digital Appendix before importing progress.'
+              : 'BADGE 進度檔不能在此還原。請先開啟或建立紀錄冊，再到「數位附錄」連接並登入 BADGE 後匯入。',
+            'error',
+          );
           return;
         }
-        throw new Error(isEn ? 'Not a VSBOOK or vsbadge JSON file' : '這不是 VSBOOK 或 vsbadge 備份檔');
+        throw new Error(isEn ? 'Not a complete VSBOOK backup JSON' : '這不是完整的 VSBOOK 紀錄冊備份檔');
       } catch (err) {
         push(err.message || (isEn ? 'Invalid file format' : '檔案格式不正確'), 'error');
       }

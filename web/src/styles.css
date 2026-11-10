@@ -4026,3 +4026,50 @@ html[data-print-preview] .write--multi.is-empty {
   background: #140408;
   object-fit: cover;
 }
+
+/* BADGE sync states: high-contrast Venture Scout maroon and archival paper. */
+.vsbsync__locked,
+.vsbsync__notfound {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 10px 0;
+  padding: 11px 12px;
+  border: 1px solid rgba(122, 20, 38, 0.34);
+  border-radius: 6px;
+  background: #f7f2e7;
+  color: #1e1a14;
+}
+.vsbsync__locked > .icon { flex: 0 0 auto; color: #7a1426; margin-top: 2px; }
+.vsbsync__locked strong { display: block; color: #7a1426; }
+.vsbsync__locked p,
+.vsbsync__notfound p { margin: 3px 0 0; color: #1e1a14; }
+.vsbsync__notfound { display: block; border-left: 4px solid #7a1426; }
+.vsbsync__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 9px; }
+.vsbsync__liststatus {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+  color: #1e1a14;
+  font-size: 12px;
+}
+.vsbsync__refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  border: 1px solid rgba(122, 20, 38, 0.35);
+  border-radius: 4px;
+  color: #7a1426;
+  font-weight: 700;
+}
+.vsbsync__refresh:disabled { opacity: 0.6; cursor: wait; }
+@media print {
+  .vsbsync__locked,
+  .vsbsync__notfound,
+  .vsbsync__liststatus,
+  .vsbsync__refresh { display: none !important; }
+}

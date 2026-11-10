@@ -1,8 +1,8 @@
 # VSBOOK · 深資童軍電子紀錄冊
 
-> **深資童軍個人隨身離線電子紀錄冊** —— 逐頁對應香港童軍總會《深資童軍紀錄冊》第 1–40 頁及 2026 年第十一版《深資童軍訓練綱要》，支援就地打字／手寫與簽名、一鍵生成及列印 `PT/65`・`PT/19`・`PT/20` 三張官方表格、成員⇄領袖純離線二維碼傳送與核簽回傳，以及與 `vsbadge` 進度 JSON 雙向互通。
+> **深資童軍個人隨身離線電子紀錄冊** —— 逐頁對應香港童軍總會《深資童軍紀錄冊》第 1–40 頁及 2026 年第十一版《深資童軍訓練綱要》，支援就地打字／手寫與簽名、一鍵生成及列印 `PT/65`・`PT/19`・`PT/20` 三張官方表格、成員⇄領袖純離線二維碼傳送與核簽回傳，以及登入後與 `vsbadge` 進度 JSON 雙向互通。
 
-- **目前版本**：`v1.0.1`（2026-11-09）
+- **目前版本**：`v1.0.2`（2026-11-10）
 - **架構形態**：離線優先 PWA（React + Vite + Service Worker，`localStorage` 本機儲存，零帳號、零雲端上傳；可選配 Vercel `/api/leader` 伺服器端領袖密碼驗證）
 - **設計主題**：對齊 `ROVERBOOK`（`v16`）介面、安全區與版權配置規範，採用**深資童軍紅布面燙金封面**（Venture Scout Maroon `#540f1e` × 支部酒紅 `#7a1426` × 燙金 `#d8b871` × 象牙內頁 `#f7f2e7`），內嵌支部徽及全套 13 張官方獎章／金帶圖案、全套 SVG／ICO／PNG／Maskable Favicon 圖示、**中英文完全分開顯示（節省版面）**，以及嚴格區隔**領袖模式（只讀）**與**普通模式（不能讀）**
 
@@ -42,6 +42,8 @@ rm -rf dist && node scripts/preflight_v1.0.mjs . --json
    - **定位清晰**：`VSBOOK`（`BOOK`）純粹是成員個人的實體紀錄冊電子版；`vsbadge`（`BADGE`）則是領袖用來一次過檢視及填寫全團進度的旅團進度表，兩者各司其職，省卻成員在 `BOOK` 寫一次、又要在 `BADGE` 重打一次的功夫。
    - **由 `BADGE` 錄入進 `BOOK`**：`BOOK` **無條件相信**在 `vsbadge` 內已獲領袖核實（CONFIRMED）的進度並寫入紀錄冊；處於「待領袖核實（pending）」的未核實項目**絕不錄入**，且**絕不錄入任何個人資料**。
    - **由 `BOOK` 送交 `BADGE`**：成員在 `BOOK` 記錄的進度送往 `vsbadge` 時，一律經 `requestComplete` 變成**「待領袖核實（pending）」**（`/api/vsbadge` 嚴禁直接呼叫 `save` 寫入已核實進度），領袖仍須在 `vsbadge` 內按 CONFIRM 方為完成，杜絕成員扮自己已完成。
+   - **進度檔匯出／匯入**：僅限已連接並登入 BADGE 帳戶；未登入時按鈕會鎖定。此限制只適用 BADGE 進度檔，本機「完整備份 JSON／還原備份 JSON」及整本紀錄冊仍完全離線可用。
+   - 數位附錄自動讀取 BADGE 已登記旅團；沒有旅團或選擇「找不到旅團」時才提供 BADGE 登記及成員開戶連結。
 7. **中英文完全分開（節省版面）與全套 Favicon／PWA 圖示**：頂欄與歡迎頁一鍵切換繁體中文／English，單語乾淨呈現、不並排重複佔位；齊備 `/favicon.svg`、`/favicon.ico`、`/favicon-32.png`、`/favicon-48.png` 及 `/icons/*` 全套 iOS / Android 主畫面與 OG 圖示。
 
 ### Vercel 部署設定（領袖密碼 `LEADER_CODE` 及 `vsbadge` 後端配合）
@@ -53,7 +55,7 @@ rm -rf dist && node scripts/preflight_v1.0.mjs . --json
    - **Value**：你設定的領袖密碼（本機 `npm run dev` 未設定時預設為 `1234` 方便測試）
    - **Scope**：`Production`（及 `Preview`）
    - 設定後重新部署（Redeploy）；若未設定 `LEADER_CODE`，系統會自動隱藏領袖模式入口，作為純成員版運作。
-2. **`VSBADGE_ORIGIN`**（選填，預設自動對接 `https://vsbadge.vercel.app`）：
+2. **`VSBADGE_ORIGIN`**（選填，預設自動對接部署網址 `https://vsbadge.vercel.app`）：
    - 供成員在「數位附錄」一鍵連接自己的 `vsbadge` 帳戶，錄入領袖已核實進度或將新填進度送交 `vsbadge` 待領袖核實（如有自建 `vsbadge` 網址，可設 `VSBADGE_ORIGIN=https://你的-vsbadge-網址`）。
 
 ---
