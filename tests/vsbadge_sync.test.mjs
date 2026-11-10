@@ -10,6 +10,8 @@ import {
 import vsbadgeHandler, {
   filterPersonalConfirmedLoad,
   sanitizePendingSubmissions,
+  resolveVsBadgeOrigin,
+  DEFAULT_VSBADGE_ORIGIN,
 } from '../api/vsbadge.js';
 
 function callHandler(reqInit) {
@@ -259,4 +261,42 @@ test('/api/vsbadge 伺服器守衛：嚴禁 save 直寫已核實進度（403）�
   // 直接單元測試 sanitizePendingSubmissions 與 filterPersonalConfirmedLoad
   assert.equal(sanitizePendingSubmissions([{ itemId: 'L1-A1', date: 'bad-date' }]).length, 0);
   assert.equal(filterPersonalConfirmedLoad({ success: true, progress: {} }, '').success, false);
+});
+
+
+test('BADGE defaults to its deployed origin and GET filters disconnected troops and aliases while reporting upstreamOk', async () => {
+  const previousOrigin = process.env.VSBADGE_ORIGIN;
+  const previousTestFlag = process.env.VSBOOK_PROXY_TEST;
+  delete process.env.VSBADGE_ORIGIN;
+  assert.equal(DEFAULT_VSBADGE_ORIGIN, 'https://vsbadge.vercel.app');
+  assert.equal(resolveVsBadgeOrigin(), 'https://vsbadge.vercel.app');
+
+  const server = http.createServer((req, res) => {
+    assert.equal(req.url, '/api/troops');
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ troops: {
+      '82': { name: '82nd Group' },
+      '0082': { name: 'Alias group', _aliasOf: '82' },
+      '99': { name: 'Closed group', connected: false },
+      '101': { name: 'Registered group', en: '101st Group' },
+    } }));
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  process.env.VSBOOK_PROXY_TEST = '1';
+  process.env.VSBADGE_ORIGIN = `http://127.0.0.1:${server.address().port}`;
+  try {
+    const response = await callHandler({ method: 'GET' });
+    assert.equal(response.status, 200);
+    assert.equal(response.body.origin, process.env.VSBADGE_ORIGIN);
+    assert.equal(response.body.upstreamOk, true);
+    assert.deepEqual(Object.keys(response.body.troops), ['82', '101']);
+    assert.equal(response.body.troops['0082'], undefined);
+    assert.equal(response.body.troops['99'], undefined);
+  } finally {
+    if (previousOrigin === undefined) delete process.env.VSBADGE_ORIGIN;
+    else process.env.VSBADGE_ORIGIN = previousOrigin;
+    if (previousTestFlag === undefined) delete process.env.VSBOOK_PROXY_TEST;
+    else process.env.VSBOOK_PROXY_TEST = previousTestFlag;
+    await new Promise((resolve) => server.close(resolve));
+  }
 });

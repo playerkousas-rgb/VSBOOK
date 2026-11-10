@@ -37,6 +37,9 @@ export default function VsBadgeSyncCard({ readOnly = false }) {
 
   const mySid = scoutId(book?.member);
   const [troops, setTroops] = useState({});
+  const [badgeOrigin, setBadgeOrigin] = useState('https://vsbadge.vercel.app');
+  const [upstreamOk, setUpstreamOk] = useState(false);
+  const [loadingTroops, setLoadingTroops] = useState(false);
   const [troopId, setTroopId] = useState(() => readMemberSession()?.troopId || '');
   const [loginYmis, setLoginYmis] = useState(() => mySid || readMemberSession()?.ymis || '');
   const [password, setPassword] = useState('');
@@ -50,24 +53,33 @@ export default function VsBadgeSyncCard({ readOnly = false }) {
     if (mySid && !loginYmis) setLoginYmis(mySid);
   }, [mySid, loginYmis]);
 
+  const refreshTroops = async () => {
+    setLoadingTroops(true);
+    try {
+      const response = await fetch('/api/vsbadge');
+      const data = await response.json();
+      if (!data?.troops || typeof data.troops !== 'object') throw new Error('Invalid troop list');
+      setTroops(data.troops);
+      setBadgeOrigin(data.origin || 'https://vsbadge.vercel.app');
+      setUpstreamOk(data.upstreamOk === true);
+      if (!troopId || troopId === '__NOT_FOUND__') {
+        const first = Object.keys(data.troops)[0];
+        if (first) setTroopId(first);
+      }
+    } catch {
+      setUpstreamOk(false);
+    } finally {
+      setLoadingTroops(false);
+    }
+  };
+
   useEffect(() => {
-    let alive = true;
-    fetch('/api/vsbadge')
-      .then((r) => r.json())
-      .then((d) => {
-        if (!alive || !d?.troops) return;
-        setTroops(d.troops);
-        if (!troopId) {
-          const first = Object.keys(d.troops)[0];
-          if (first) setTroopId(first);
-        }
-      })
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
+    refreshTroops();
+    // Fetch the troop list once on card mount; the manual refresh button calls the same function.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const hasBadgeSession = Boolean(session?.token && session?.ymis);
   const confirmedInBookCount = useMemo(
     () =>
       Object.values(book?.progress || {}).filter(
@@ -133,6 +145,7 @@ export default function VsBadgeSyncCard({ readOnly = false }) {
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    if (troopId === '__NOT_FOUND__') return;
     const cleanTroop = troopId.trim();
     const cleanYmis = (loginYmis || mySid || '').trim();
     if (!cleanTroop || !cleanYmis || !password) {
@@ -235,6 +248,11 @@ export default function VsBadgeSyncCard({ readOnly = false }) {
   };
 
   const onImportFile = (e) => {
+    if (!session?.token || !session?.ymis) {
+      if (e?.target) e.target.value = '';
+      push(isEn ? 'Connect and sign in to BADGE before importing a progress file.' : '請先連接並登入 BADGE 帳戶，方可匯入進度檔。', 'error');
+      return;
+    }
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
@@ -260,6 +278,16 @@ export default function VsBadgeSyncCard({ readOnly = false }) {
       }
     };
     reader.readAsText(file);
+  };
+
+  const onExportFile = () => {
+    if (!session?.token || !session?.ymis) {
+      push(isEn ? 'Connect and sign in to BADGE before exporting a progress file.' : '請先連接並登入 BADGE 帳戶，方可匯出進度檔。', 'error');
+      return;
+    }
+    const payload = exportForVsBadge(book, session.troopId || troopId || '');
+    download(`vsbook-pending-for-vsbadge-${slugify(mySid || 'member')}.json`, payload);
+    push(isEn ? 'Exported Pending progress file (zero personal data)' : '已匯出「待領袖核實」純進度檔（不含個人資料）');
   };
 
   const troopEntries = Object.entries(troops);
@@ -297,7 +325,7 @@ export default function VsBadgeSyncCard({ readOnly = false }) {
 
       {/* 雲端直連 vsbadge */}
       <div className="appxbtns">
-        {session ? (
+        {hasBadgeSession ? (
           <>
             <button
               type="button"
@@ -348,95 +376,97 @@ export default function VsBadgeSyncCard({ readOnly = false }) {
         )}
       </div>
 
-      {showLogin && !session && (
+      {!hasBadgeSession && troopEntries.length === 0 && (
+        <div className="vsbsync__notfound" role="status">
+          <p>{isEn ? 'No registered groups were found. Register your group and open member accounts in vsbadge first.' : '目前讀取不到已登記旅團。請先在 BADGE 完成旅團登記及成員開戶。'}</p>
+          <div className="vsbsync__actions">
+            <button type="button" className="btn btn--ghost btn--sm" onClick={refreshTroops} disabled={loadingTroops}>
+              <Icon name="refresh" size={14} /> {loadingTroops ? (isEn ? 'Loading…' : '讀取中…') : (isEn ? 'Reload troop list' : '重新讀取旅團清單')}
+            </button>
+            <button type="button" className="btn btn--ghost btn--sm" onClick={() => setShowLogin(true)}>
+              {isEn ? 'Enter Group ID manually' : '手動輸入旅團編號'}
+            </button>
+            <a className="btn btn--gold btn--sm" href={badgeOrigin} target="_blank" rel="noopener noreferrer">
+              <Icon name="external" size={14} /> {isEn ? 'Open vsbadge' : '前往 BADGE 開戶'}
+            </a>
+          </div>
+        </div>
+      )}
+
+      {!hasBadgeSession && troopEntries.length > 0 && (
+        <p className="vsbsync__liststatus" role="status">
+          {upstreamOk
+            ? (isEn ? `Automatically loaded ${troopEntries.length} registered groups from vsbadge.` : `已自動讀取 ${troopEntries.length} 個 BADGE 已登記旅團，可直接選取。`)
+            : (isEn ? 'Showing configured groups; the vsbadge list could not be refreshed.' : '目前顯示可用旅團；未能成功連線讀取 BADGE 最新清單。')}
+          <button type="button" className="vsbsync__refresh" onClick={refreshTroops} disabled={loadingTroops}>
+            <Icon name="refresh" size={14} /> {isEn ? 'Refresh' : '重新讀取'}
+          </button>
+        </p>
+      )}
+
+      {!hasBadgeSession && troopId === '__NOT_FOUND__' && (
+        <div className="vsbsync__notfound" role="status">
+          <p>{isEn ? 'If your group is not listed, complete group registration and create your member account in vsbadge first.' : '請先在 BADGE 完成旅團登記及成員開戶，之後返回選取旅團並登入。'}</p>
+          <a className="btn btn--gold btn--sm" href={badgeOrigin} target="_blank" rel="noopener noreferrer">
+            <Icon name="external" size={14} /> {isEn ? 'Go to vsbadge registration' : '前往 BADGE 旅團登記及開戶'}
+          </a>
+        </div>
+      )}
+
+      {showLogin && !hasBadgeSession && (
         <form className="vsbsync__login" onSubmit={handleLogin}>
           <div className="vsbsync__fields">
             <label>
-              <span>{isEn ? 'Group / Unit' : '所屬旅團'}</span>
+              <span>{isEn ? 'Registered group' : '所屬已登記旅團'}</span>
               {troopEntries.length > 0 ? (
                 <select value={troopId} onChange={(e) => setTroopId(e.target.value)}>
                   {troopEntries.map(([id, info]) => (
-                    <option key={id} value={id}>
-                      {id} · {isEn && info.en ? info.en : info.name}
-                    </option>
+                    <option key={id} value={id}>{id} · {isEn && info.en ? info.en : info.name}</option>
                   ))}
+                  <option value="__NOT_FOUND__">{isEn ? "Can't find my group — BADGE registration" : '找不到我的旅團（前往 BADGE 開戶）'}</option>
                 </select>
               ) : (
-                <input
-                  type="text"
-                  value={troopId}
-                  onChange={(e) => setTroopId(e.target.value)}
-                  placeholder={isEn ? 'e.g. 0082' : '旅團編號（如 0082）'}
-                />
+                <input type="text" value={troopId === '__NOT_FOUND__' ? '' : troopId} onChange={(e) => setTroopId(e.target.value)} placeholder={isEn ? 'e.g. 0082' : '手動輸入旅團編號（如 0082）'} />
               )}
             </label>
-            <label>
-              <span>{isEn ? 'My Scout ID (YMIS)' : '我的童軍成員編號'}</span>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={loginYmis}
-                onChange={(e) => setLoginYmis(e.target.value)}
-                placeholder={isEn ? '10-digit Scout ID' : '10 位童軍成員編號'}
-              />
-            </label>
-            <label>
-              <span>{isEn ? 'vsbadge Password' : 'vsbadge 密碼'}</span>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-                placeholder="••••••••"
-              />
-            </label>
-            <button type="submit" className="btn btn--primary btn--sm" disabled={busy}>
-              {busy
-                ? isEn
-                  ? 'Connecting…'
-                  : '連線中…'
-                : isEn
-                  ? 'Connect & Sync Confirmed'
-                  : '登入並錄入已核實進度'}
-            </button>
+            {troopId !== '__NOT_FOUND__' && <>
+              <label>
+                <span>{isEn ? 'My Scout ID' : '我的童軍成員編號'}</span>
+                <input type="text" inputMode="numeric" value={loginYmis} onChange={(e) => setLoginYmis(e.target.value)} placeholder={isEn ? '10-digit Scout ID' : '童軍成員編號'} />
+              </label>
+              <label>
+                <span>{isEn ? 'vsbadge Password' : 'BADGE 密碼'}</span>
+                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" placeholder="••••••••" />
+              </label>
+              <button type="submit" className="btn btn--primary btn--sm" disabled={busy}>
+                {busy ? (isEn ? 'Connecting…' : '連線中…') : (isEn ? 'Connect & Sync Confirmed' : '登入並錄入已核實進度')}
+              </button>
+            </>}
           </div>
         </form>
       )}
 
-      {/* 離線 JSON 交換 */}
-      <div className="appxbtns vsbsync__files">
-        <button
-          type="button"
-          className="btn btn--ghost btn--sm"
-          onClick={() => {
-            const payload = exportForVsBadge(book, session?.troopId || troopId || '');
-            download(`vsbook-pending-for-vsbadge-${slugify(mySid || 'member')}.json`, payload);
-            push(
-              isEn
-                ? 'Exported Pending submission JSON (status: pending, zero personal data)'
-                : '已匯出「待領袖核實」純進度檔（status: pending，不含個人資料）',
-            );
-          }}
-        >
-          <Icon name="download" size={14} />{' '}
-          {isEn
-            ? 'Export Pending JSON for vsbadge'
-            : '匯出「待領袖核實」進度檔（供 vsbadge）'}
-        </button>
+      {/* BADGE 進度檔匯出／匯入只限已登入帳戶；完整 BOOK 備份仍可離線使用。 */}
+      {hasBadgeSession ? (
+        <div className="appxbtns vsbsync__files">
+          <button type="button" className="btn btn--ghost btn--sm" onClick={onExportFile}>
+            <Icon name="download" size={14} /> {isEn ? 'Export Pending Progress File' : '匯出「待領袖核實」進度檔'}
+          </button>
+          <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={onImportFile} />
+          <button type="button" className="btn btn--ghost btn--sm" disabled={readOnly} onClick={() => fileRef.current?.click()}>
+            <Icon name="upload" size={14} /> {isEn ? 'Import Leader-Confirmed Progress' : '匯入「領袖已核實」進度檔'}
+          </button>
+        </div>
+      ) : (
+        <div className="vsbsync__locked" role="note">
+          <Icon name="lock" size={17} />
+          <div>
+            <strong>{isEn ? 'BADGE progress-file exchange is locked' : 'BADGE 進度檔匯出／匯入已鎖定'}</strong>
+            <p>{isEn ? 'Connect and sign in to your BADGE account to exchange progress files. The full BOOK backup below remains available offline.' : '須先連接並登入 BADGE 帳戶，方可匯出或匯入 BADGE 進度檔；下方「完整備份 JSON／還原備份 JSON」仍可完全離線使用。'}</p>
+          </div>
+        </div>
+      )}
 
-        <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={onImportFile} />
-        <button
-          type="button"
-          className="btn btn--ghost btn--sm"
-          disabled={readOnly}
-          onClick={() => fileRef.current?.click()}
-        >
-          <Icon name="upload" size={14} />{' '}
-          {isEn
-            ? 'Import Confirmed JSON from vsbadge'
-            : '從 vsbadge 匯入「領袖已核實」進度檔'}
-        </button>
-      </div>
     </section>
   );
 }

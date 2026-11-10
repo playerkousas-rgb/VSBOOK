@@ -2,6 +2,14 @@
 
 本專案採用語意化版本（Semantic Versioning），每次更新同步遞增四處版本號：`package.json`、`shared/book.js`（`APP_VERSION`）、`web/index.html`（`meta[name="app-version"]`）及 **Service Worker 快取名**（`web/public/sw.js` 的 `CACHE_NAME`）。只改程式碼不改快取名，已安裝的 APP 會永遠收到舊版面。
 
+## [v1.0.2] — 2026-11-10
+
+### 修正（Fixed）
+- 校正並測試 BADGE 預設來源 `https://vsbadge.vercel.app`；旅團清單略過已停用項目及指向現存主旅團的別名，並回傳 `upstreamOk` 狀態。
+- 數位附錄明確列出自動讀取的旅團、可重新讀取／手動輸入；清單為空或選取「找不到旅團」時才顯示 BADGE 登記及開戶連結。
+- BADGE 進度 JSON 匯出／匯入只限已連接並登入帳戶；完整 VSBOOK 備份還原與離線本機功能維持可用。歡迎頁不再將 BADGE 進度檔當成本機 BOOK 備份匯入。
+- 補齊 BADGE 同步狀態圖示、酒紅主題樣式、列印隱藏規則及 API／介面契約測試。
+
 ## [v1.0.1] — 2026-11-09
 
 ### 修正（Fixed）

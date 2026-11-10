@@ -10,7 +10,7 @@
       必須由領袖在 vsbadge 內 CONFIRM 方為完成，杜絕成員扮自己已完成。
    ========================================================================== */
 
-const DEFAULT_VSBADGE_ORIGIN = 'https://vsbadge.vercel.app';
+export const DEFAULT_VSBADGE_ORIGIN = 'https://vsbadge.vercel.app';
 const EXEC_URL_RE = /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]{10,}\/exec\/?$/i;
 const TEST_LOCAL_RE = /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?(\/[A-Za-z0-9._~\-/?=&%]*)?$/;
 const ALLOWED_ACTIONS = new Set(['login', 'logout', 'load', 'submitPending']);
@@ -248,6 +248,7 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     const troops = Object.create(null);
+    let upstreamOk = false;
     for (const [id, t] of Object.entries(localRegistry)) {
       troops[id] = { name: t.name, ...(t.en ? { en: t.en } : {}) };
     }
@@ -259,9 +260,15 @@ export default async function handler(req, res) {
       });
       if (up.ok) {
         const json = await up.json().catch(() => null);
-        if (json?.troops && typeof json.troops === 'object') {
+        if (json?.troops && typeof json.troops === 'object' && !Array.isArray(json.troops)) {
+          upstreamOk = true;
           for (const [id, info] of Object.entries(json.troops)) {
-            if (!troops[id] && info && typeof info === 'object' && info.name) {
+            if (!info || typeof info !== 'object' || info.connected === false) continue;
+            if (info._aliasOf && Object.hasOwn(json.troops, String(info._aliasOf))) {
+              delete troops[id];
+              continue;
+            }
+            if (!troops[id] && info.name) {
               troops[id] = { name: String(info.name), ...(info.en ? { en: String(info.en) } : {}) };
             }
           }
@@ -274,6 +281,7 @@ export default async function handler(req, res) {
       success: true,
       origin,
       privacy: 'progress-only',
+      upstreamOk,
       troops,
     });
   }
