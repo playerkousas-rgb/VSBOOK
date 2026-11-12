@@ -67,6 +67,19 @@ test('示範資料達本支部最高獎章（榮譽童軍獎章）申請測試�
   }
 });
 
+test('第 3 頁童軍紀錄：各支部「獲取之最高獎章」須用正確章名（小童軍無金箭章）', () => {
+  const demo = demoBook();
+  const { scouting } = demo;
+  // 小童軍支部進度性獎章為「前進章」第一至第四步，並沒有金箭章
+  assert.match(scouting.grasshopper.award, /前進章/, '小童軍最高進度應為前進章第四步');
+  assert.doesNotMatch(scouting.grasshopper.award, /金箭/, '小童軍沒有金箭章');
+  // 幼童軍（現行綱要）最高為金紫荊獎章；童軍支部最高為總領袖獎章
+  assert.equal(scouting.cub.award, '金紫荊獎章');
+  assert.equal(scouting.scout.award, '總領袖獎章');
+  // 金箭章只屬幼童軍舊制（銅／銀／金箭章），全份示範冊不得再出現
+  assert.ok(!/金箭/.test(JSON.stringify(demo)), '示範冊不得出現「金箭章」');
+});
+
 test('示範簽名絕不冒用真實簽名：全部為程式產生的抽象墨跡，且署名與簽署人一致', () => {
   const sigs = collectDemoSignatures(demoBook());
   assert.ok(sigs.length >= 10, `示範冊應有多個簽署，實得 ${sigs.length} 個`);

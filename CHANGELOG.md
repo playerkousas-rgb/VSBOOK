@@ -2,6 +2,15 @@
 
 本專案採用語意化版本（Semantic Versioning），每次更新同步遞增四處版本號：`package.json`、`shared/book.js`（`APP_VERSION`）、`web/index.html`（`meta[name="app-version"]`）及 **Service Worker 快取名**（`web/public/sw.js` 的 `CACHE_NAME`）。只改程式碼不改快取名，已安裝的 APP 會永遠收到舊版面。
 
+## [v1.0.4] — 2026-11-12
+
+### 修正（Fixed）
+- **示範紀錄冊第 3 頁（童軍紀錄）小童軍支部「獲取之最高獎章」誤寫「金箭章」**：金箭章並非小童軍支部獎章（小童軍只有前進章第一步至第四步），亦非幼童軍現行獎章（金箭章只屬幼童軍舊制銅／銀／金箭章）。示範資料更正為「前進章第四步」；幼童軍維持「金紫荊獎章」、童軍維持「總領袖獎章」。
+- 新增回歸測試：示範冊第 3 頁三個支部最高獎章名稱必須正確，且全份示範資料不得再出現「金箭章」。
+
+### 同步（Chore）
+- 四處版本號同步遞增至 `v1.0.4`（`package.json`、`shared/book.js` `APP_VERSION`、`web/index.html` meta、`web/public/sw.js` `CACHE_NAME`）。
+
 ## [v1.0.3] — 2026-11-12
 
 ### 新增（Added）
