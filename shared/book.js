@@ -5,7 +5,7 @@ import { BADGE_SYLLABUS, OTHER_BADGES, SYLLABUS_ITEMS, ITEM_INDEX, SYLLABUS_META
 
 export { BADGE_SYLLABUS, OTHER_BADGES, SYLLABUS_ITEMS, ITEM_INDEX, SYLLABUS_META };
 
-export const APP_VERSION = 'v1.0.3';
+export const APP_VERSION = 'v1.0.4';
 export const STORE_KEY = 'vsbook.book.v1';
 export const LEGACY_STORE_KEYS = [];
 
@@ -777,7 +777,7 @@ export function demoBook() {
     },
     holderSignature: { png: SIG_HOLDER, name: '張芷晴', at: '2025-09-06' },
     scouting: {
-      grasshopper: { from: '2016-09', to: '2018-08', unit: '港島第 28 旅小童軍團', post: '小童軍', award: '金箭章' },
+      grasshopper: { from: '2016-09', to: '2018-08', unit: '港島第 28 旅小童軍團', post: '小童軍', award: '前進章第四步' },
       cub: { from: '2018-09', to: '2021-08', unit: '港島第 28 旅幼童軍團', post: '隊長', award: '金紫荊獎章' },
       scout: { from: '2021-09', to: '2025-08', unit: '港島第 28 旅童軍團', post: '小隊長', award: '總領袖獎章' },
     },

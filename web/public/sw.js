@@ -1,7 +1,7 @@
 /* VSBOOK Service Worker — 確保露營、遠足及離線集會現場仍可完整開啟與讀寫紀錄冊。 */
 
 /* 每次發版必須同步遞增：只改程式碼不改快取名，已安裝的 APP 永遠收到舊版面。 */
-const CACHE_NAME = 'vsbook-cache-v1.0.3';
+const CACHE_NAME = 'vsbook-cache-v1.0.4';
 const SHELL = [
   '/',
   '/index.html',
