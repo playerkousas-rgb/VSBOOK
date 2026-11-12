@@ -7,11 +7,24 @@ import {
   buildFormValues,
   formReadiness,
 } from '@shared/forms.js';
+import { isDemoBook } from '@shared/book.js';
 import { useBook } from '../bookContext.js';
 import Write from '../components/Write.jsx';
 import { Icon } from '../ui.jsx';
 import { Link } from '../router.jsx';
 import { useLang } from '../i18n.jsx';
+
+/* 示範樣本蓋印：示範資料列印的每一頁表格都必須清楚標示，螢幕及列印均可見 */
+function DemoStamp() {
+  const { book } = useBook();
+  if (!isDemoBook(book)) return null;
+  return (
+    <div className="demostamp" role="note">
+      <strong>示範樣本，只供測試，不可遞交</strong>
+      <span>SAMPLE ONLY — FOR PRINT TESTING, DO NOT SUBMIT</span>
+    </div>
+  );
+}
 
 function usePrintPreview() {
   const [on, setOn] = useState(false);
@@ -70,6 +83,14 @@ export function FormsIndex() {
               ? 'Personal particulars, Scout ID, HKID first-4-char prefix, dates and signatures are auto-populated from your record book. Tap any box to fine-tune before A4 printing.'
               : '個人摘要、Scout ID、香港身份證首四碼、各段章／金帶完成日期及申請人簽名均由紀錄冊自動帶入；列印前仍可點擊任何格線微調。'}
           </p>
+          {isDemoBook(book) && (
+            <p className="formcard__demo" role="note">
+              <Icon name="alert" size={14} />{' '}
+              {isEn
+                ? 'Demo data loaded — every printed sheet is stamped “SAMPLE ONLY, DO NOT SUBMIT”.'
+                : '目前為示範資料 — 列印表格每頁均會加蓋「示範樣本，只供測試，不可遞交」，不可遞交。'}
+            </p>
+          )}
         </div>
         <div className="formsindex__btns">
           <Link to="/p/p01" className="btn btn--ghost btn--sm">
@@ -133,6 +154,7 @@ function FormPT65() {
 
   return (
     <article className="a4sheet">
+      <DemoStamp />
       <header className="pthead">
         <div>
           <strong>香港童軍總會 Scout Association of Hong Kong</strong>
@@ -293,6 +315,7 @@ function EndorsementBackPage({ code, awardZh, awardEn, values, set, rallyNote = 
   const { book } = useBook();
   return (
     <article className="a4sheet">
+      <DemoStamp />
       <header className="pthead pthead--compact">
         <strong>{code} · 第 2 頁（背面須與第 1 頁雙面列印於同一張紙）</strong>
         <span>{awardZh} ({awardEn})</span>
@@ -393,6 +416,7 @@ function ChecklistPage({ code, list, formId }) {
 
   return (
     <article className="a4sheet">
+      <DemoStamp />
       <header className="pthead pthead--compact">
         <strong>{code} · 第 3 頁 · 查閱清單 Checklist</strong>
         <span>請於方格內填上 ✓ 號 Please ✓ in the appropriate boxes</span>
@@ -463,6 +487,7 @@ function FormPT19() {
   return (
     <>
       <article className="a4sheet">
+        <DemoStamp />
         <header className="pthead">
           <div>
             <strong>香港童軍總會 Scout Association of Hong Kong</strong>
@@ -560,6 +585,7 @@ function FormPT20() {
   return (
     <>
       <article className="a4sheet">
+        <DemoStamp />
         <header className="pthead">
           <div>
             <strong>香港童軍總會 Scout Association of Hong Kong</strong>

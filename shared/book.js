@@ -5,9 +5,14 @@ import { BADGE_SYLLABUS, OTHER_BADGES, SYLLABUS_ITEMS, ITEM_INDEX, SYLLABUS_META
 
 export { BADGE_SYLLABUS, OTHER_BADGES, SYLLABUS_ITEMS, ITEM_INDEX, SYLLABUS_META };
 
-export const APP_VERSION = 'v1.0.2';
+export const APP_VERSION = 'v1.0.3';
 export const STORE_KEY = 'vsbook.book.v1';
 export const LEGACY_STORE_KEYS = [];
+
+/** 示範紀錄冊旗標：demoBook() 產生的虛構資料一律標記，禁止同步至正式系統。 */
+export function isDemoBook(book) {
+  return Boolean(book?.meta?.isDemo);
+}
 
 export const uid = (p = 'v') => `${p}_${Math.random().toString(36).slice(2, 9)}`;
 
@@ -397,8 +402,12 @@ export function collectPendingForVsBadge(book, remoteConfirmed = {}, remotePendi
  * 輸出個人 BOOK 進度供 vsbadge 錄入：
  * - 不含任何個人資料（只有童軍成員編號 SCOUT ID／YMIS 與進度項目）；
  * - 全部標記為 `status: 'pending'`、`confirmed: false`（待領袖核實），絕不輸出為已核實 `progress`，防止成員扮已完成。
+ * - 示範紀錄冊（`meta.isDemo`）一律拒絕匯出：虛構資料絕不可同步至正式系統。
  */
 export function exportForVsBadge(book, troopId = '') {
+  if (isDemoBook(book)) {
+    throw new Error('示範樣本不可同步至正式系統：請先清空重設為空白冊並填入真實紀錄');
+  }
   const sid = scoutId(book?.member) || 'UNSET';
   const cleanSid = sid === 'UNSET' ? '' : sid;
   const items = collectPendingForVsBadge(book);
@@ -702,8 +711,14 @@ const SIG_VSL = inkSvg(
   '#5a1321',
 );
 
-/* 示範簽名只放純姓名：實際簽署最多只寫名字，不會寫成「陳某某 團長」 */
+/* 示範簽名只放純姓名：實際簽署最多只寫名字，不會寫成「陳某某 團長」。
+   以下墨跡均為程式產生的抽象曲線（非真實簽名影像），人名亦屬虛構，僅供介面測試。 */
 const vslSig = (at) => ({ png: SIG_VSL, name: '陳志軒', at });
+const SIG_GENERIC = inkSvg(
+  'M16 50 C 30 34, 44 28, 58 36 C 70 43, 60 56, 74 52 C 90 48, 96 30, 112 34 C 126 38, 120 54, 136 50 C 150 46, 158 32, 176 38 C 192 43, 196 56, 214 48',
+  '#4a2430',
+);
+const assessorSig = (name, at) => ({ png: SIG_GENERIC, name, at });
 
 export function demoBook() {
   const progress = {};
@@ -723,6 +738,12 @@ export function demoBook() {
   progress['L3-EXP-V11-PRE-MAP'] = { date: '2026-03-15', assessor: '張家豪', cert: 'MAP-2026-055' };
   progress['L3-EXP-V11-PRE-EXPEDITION'] = { date: '2026-05-24', assessor: '張家豪', cert: 'EXPTR-2026-021' };
   progress['L3-EXP-V11-HIKING'] = { date: '2026-08-23', assessor: '張家豪', cert: 'VS-EXP-2026-091' };
+  // L4 四條金帶（榮譽童軍獎章）：多元技能取兩個不同範疇（童軍技能＋康樂體育），探險取海上旅程
+  progress['L4-PROJ-01'] = { date: '2026-10-10', assessor: '周國樑', cert: 'VSPBAR-2026-301' };
+  progress['L4-SERV-02'] = { date: '2026-10-24', assessor: '黃敏儀', cert: 'VSSBAR-2026-302' };
+  progress['L4-ACT-V11-CAMPCRAFT'] = { date: '2026-10-31', assessor: '李偉傑', cert: 'VSABAR-2026-303' };
+  progress['L4-ACT-V11-SPORT-52'] = { date: '2026-11-07', assessor: '李偉傑', cert: 'VSABAR-2026-304' };
+  progress['L4-EXP-V11-SEA'] = { date: '2026-11-08', assessor: '張家豪', cert: 'VSEBAR-2026-305' };
   progress['OT-FA'] = { date: '2026-05-03', cert: 'VSFA-2026-204' };
   progress['OT-ENV'] = { date: '2026-04-26', cert: 'WSEP-2026-077' };
 
@@ -785,7 +806,7 @@ export function demoBook() {
         assessorName: '周國樑',
         assessorPost: '區深資童軍領袖',
         assessorDate: '2026-04-12',
-        assessorSig: vslSig('2026-04-12'),
+        assessorSig: assessorSig('周國樑', '2026-04-12'),
         completedDate: '2026-04-19',
         certNo: 'VSPB-2026-215',
       },
@@ -795,11 +816,13 @@ export function demoBook() {
         part1Assessor: '陳志軒',
         part1Post: '深資童軍團長',
         part1Date: '2026-05-03',
+        part1Sig: vslSig('2026-05-03'),
         part2Choice: 'L3-SERVICE-06',
         part2CertNo: 'MHFA-2026-312',
         part2Assessor: '黃敏儀',
         part2Post: '助理區總監（深資）',
         part2Date: '2026-06-14',
+        part2Sig: assessorSig('黃敏儀', '2026-06-14'),
         completedDate: '2026-06-20',
         certNo: 'VSSB-2026-188',
       },
@@ -812,6 +835,7 @@ export function demoBook() {
         comments: '繩結及編結紮實，安全檢查嚴謹，能清晰指導團員分工完成工程架設。',
         assessorName: '李偉傑',
         assessorPost: '先鋒工程教練員',
+        assessorSig: assessorSig('李偉傑', '2026-07-19'),
         assessorDate: '2026-07-19',
         completedDate: '2026-07-26',
         certNo: 'VSAB-2026-142',
@@ -827,6 +851,7 @@ export function demoBook() {
         assessorPost: '一級遠足審核員',
         assessorNo: 'HA-1084',
         regNo: 'VSEXP-26-309',
+        assessorSig: assessorSig('張家豪', '2026-08-23'),
         assessorDate: '2026-08-23',
         completedDate: '2026-09-05',
         certNo: 'VSEB-2026-099',
@@ -839,6 +864,92 @@ export function demoBook() {
         dcComments: '張員積極投入執行委員會團務，四個段章規劃均衡且具反思深度，鼓勵繼續挑戰榮譽童軍獎章。',
         dcName: '何國榮',
         dcDate: '2026-09-20',
+        dcSig: assessorSig('何國榮', '2026-09-20'),
+      },
+      p21: {
+        selectedItem: 'L4-PROJ-01',
+        summary: '策劃並執行港島第 28 旅深資童軍團 2026 年度週年露營活動策劃（9 月 26 至 27 日，洞梓童軍中心），統籌 40 人營期節目、預算及安全計劃。',
+      },
+      p22: {
+        comments: '策劃書目標清晰，風險評估周詳，營期臨場應變成熟，能帶領執行委員會分工落實各項節目。',
+        assessorName: '周國樑',
+        assessorPost: '區深資童軍領袖',
+        assessorDate: '2026-10-10',
+        assessorSig: assessorSig('周國樑', '2026-10-10'),
+        completedDate: '2026-10-10',
+        certNo: 'VSPBAR-2026-301',
+      },
+      p23: {
+        selectedItem: 'L4-SERV-02',
+        summary: '參與香港童軍總會「童軍毅行」義工服務（10 月 3 至 4 日，檢查站支援），累計服務 16 小時，負責參加者登記及物資補給。',
+      },
+      p24: {
+        comments: '服務態度主動熱誠，通宵當值仍保持專業，能獨立處理參加者查詢及突發需要。',
+        assessorName: '黃敏儀',
+        assessorPost: '助理區總監（深資）',
+        assessorDate: '2026-10-24',
+        assessorSig: assessorSig('黃敏儀', '2026-10-24'),
+        completedDate: '2026-10-24',
+        certNo: 'VSSBAR-2026-302',
+      },
+      p25: {
+        category: 'scoutcraft',
+        subItemId: 'L4-ACT-V11-CAMPCRAFT',
+        summary: '完成港島地域營藝訓練班（證書編號 CC-2026-214），並於團露營中考取營地規劃及炊事實作評核。',
+      },
+      p26: {
+        comments: '營藝知識紮實，營地選址及炊事安排具安全意識，能指導初級團員完成營帳架設。',
+        assessorName: '李偉傑',
+        assessorPost: '營藝教練員',
+        assessorDate: '2026-10-31',
+        assessorSig: assessorSig('李偉傑', '2026-10-31'),
+        completedDate: '2026-10-31',
+        certNo: 'VSABAR-2026-303',
+      },
+      p27: {
+        category: 'sport',
+        subItemId: 'L4-ACT-V11-SPORT-52',
+        summary: '完成 52 小時毅行訓練計劃（9 至 10 月共八節操練，累計 52 小時），並於 11 月 7 日完成麥理浩徑第二至四段 32 公里評核路段。',
+      },
+      p28: {
+        comments: '體能及意志俱佳，行程中照顧隊友，充分展現深資童軍堅毅精神。',
+        assessorName: '李偉傑',
+        assessorPost: '遠足教練員',
+        assessorDate: '2026-11-07',
+        assessorSig: assessorSig('李偉傑', '2026-11-07'),
+        completedDate: '2026-11-07',
+        certNo: 'VSABAR-2026-304',
+      },
+      p29: {
+        selectedItem: 'L4-EXP-V11-SEA',
+        summary: '2026年11月5至8日（四日三夜）於西貢及大鵬灣海域進行海上旅程探險，以獨木舟環繞橋咀、鹽田梓、滘西洲、東平洲及吉澳，總航程 62 公里，以海岸生態考察為主題。',
+      },
+      p30: {
+        comments: '航海計劃及潮汐評估專業，海洋安全意識優秀，考察報告具科學記錄價值。',
+        assessorName: '張家豪',
+        assessorPost: '海上活動審核員',
+        assessorNo: 'SA-2210',
+        regNo: 'VSSEA-26-118',
+        assessorSig: assessorSig('張家豪', '2026-11-08'),
+        assessorDate: '2026-11-08',
+        completedDate: '2026-11-08',
+        certNo: 'VSEBAR-2026-305',
+      },
+      p31: {
+        dcComments: '張員四條金帶表現全面均衡，領導才能突出，熱心服務，謹推薦考取榮譽童軍獎章。',
+        dcName: '何國榮',
+        dcDate: '2026-11-09',
+        dcSig: assessorSig('何國榮', '2026-11-09'),
+      },
+      p32: {
+        rcComments: '經接見，張員對童軍運動抱負清晰，品格及領導力俱備，明日領袖之才，謹推薦頒授榮譽童軍獎章。',
+        rcName: '梁慧敏',
+        rcDate: '2026-11-10',
+        rcSig: assessorSig('梁慧敏', '2026-11-10'),
+      },
+      p33: {
+        completedDate: '2026-11-10',
+        certNo: 'DSA-2026-0118',
       },
       p34: {
         faCompletedDate: '2026-05-03',
@@ -851,7 +962,10 @@ export function demoBook() {
     ],
     expeditions: [
       { id: uid('exp'), period: '2026-08-21 至 08-23', item: '西貢東三日兩夜 44 公里遠足旅程', desc: '戶外探險段章評核旅程（北潭涌—浪茄—鹹田—嶂上）。' },
+      { id: uid('exp'), period: '2026-11-05 至 11-08', item: '西貢及大鵬灣四日三夜 62 公里海上旅程', desc: '戶外探險金帶評核旅程（橋咀—鹽田梓—滘西洲—東平洲—吉澳獨木舟環島）。' },
     ],
     progress,
+    // 示範旗標：虛構資料只供介面及列印測試，匯出／同步至正式系統時會被攔截
+    meta: { isDemo: true },
   });
 }

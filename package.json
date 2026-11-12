@@ -1,6 +1,6 @@
 {
   "name": "vsbook",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "private": true,
   "description": "VSBOOK — 深資童軍個人隨身離線電子紀錄冊 / Venture Scout Digital Record Book",
   "type": "module",

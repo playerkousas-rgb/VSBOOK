@@ -32,11 +32,14 @@ test('三張官方表格（PT/65、PT/19、PT/20）自動帶入與必填檢查',
   assert.match(pt19Ready.values.l3ProjectDetail, /VSEC-2026-048/);
   assert.match(pt19Ready.values.l3Service1Detail, /急救/);
 
-  // 示範資料尚未填榮譽童軍金帶，PT/20 應準確回報尚缺項目
+  // 示範資料已達榮譽童軍獎章申請狀態：PT/20 必須齊備可印
   const pt20Check = formReadiness(demo, 'pt20');
-  assert.equal(pt20Check.ready, false);
-  assert.ok(pt20Check.missing.some((m) => m.includes('活動策劃金帶')));
+  assert.equal(pt20Check.ready, true);
+  assert.deepEqual(pt20Check.missing, []);
   assert.equal(buildFormValues(demo, 'pt20').vsaCertNo, 'VSA-2026-0318');
+  assert.match(buildFormValues(demo, 'pt20').l4ActDetailA, /露營技藝/);
+  assert.match(buildFormValues(demo, 'pt20').l4ActDetailB, /52 小時/);
+  assert.match(buildFormValues(demo, 'pt20').l4ExpElective, /海上旅程|獨木舟/);
 });
 
 test('VS1 二維碼封包私隱隔離、壓縮編解碼及 #v= 連結解析', async () => {

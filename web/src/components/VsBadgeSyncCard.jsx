@@ -3,6 +3,7 @@ import {
   collectPendingForVsBadge,
   exportForVsBadge,
   importFromVsBadge,
+  isDemoBook,
   scoutId,
 } from '@shared/book.js';
 import { useBook } from '../bookContext.js';
@@ -80,6 +81,7 @@ export default function VsBadgeSyncCard({ readOnly = false }) {
   }, []);
 
   const hasBadgeSession = Boolean(session?.token && session?.ymis);
+  const demoBlocked = isDemoBook(book);
   const confirmedInBookCount = useMemo(
     () =>
       Object.values(book?.progress || {}).filter(
@@ -195,6 +197,15 @@ export default function VsBadgeSyncCard({ readOnly = false }) {
   };
 
   const submitBookProgressAsPending = async () => {
+    if (demoBlocked) {
+      push(
+        isEn
+          ? 'Demo sample data cannot be submitted to the live system. Reset to a blank book and fill in real records first.'
+          : '示範樣本不可送交正式系統：請先清空重設為空白冊並填入真實紀錄',
+        'error',
+      );
+      return;
+    }
     if (!session?.token || !session?.troopId || !session?.ymis) {
       setShowLogin(true);
       push(
@@ -285,6 +296,10 @@ export default function VsBadgeSyncCard({ readOnly = false }) {
       push(isEn ? 'Connect and sign in to BADGE before exporting a progress file.' : '請先連接並登入 BADGE 帳戶，方可匯出進度檔。', 'error');
       return;
     }
+    if (demoBlocked) {
+      push(isEn ? 'Demo sample data cannot be exported to the live system.' : '示範樣本不可匯出至正式系統：請先清空重設為空白冊並填入真實紀錄', 'error');
+      return;
+    }
     const payload = exportForVsBadge(book, session.troopId || troopId || '');
     download(`vsbook-pending-for-vsbadge-${slugify(mySid || 'member')}.json`, payload);
     push(isEn ? 'Exported Pending progress file (zero personal data)' : '已匯出「待領袖核實」純進度檔（不含個人資料）');
@@ -305,6 +320,16 @@ export default function VsBadgeSyncCard({ readOnly = false }) {
           ? 'Saves typing twice: BOOK → vsbadge always submits as “Pending Leader Confirmation” (cannot self-confirm); vsbadge → BOOK unconditionally trusts leader-confirmed items and ignores unconfirmed ones.'
           : '免除在紀錄冊與 vsbadge 重複輸入：由 BOOK 送往 vsbadge 一律轉為「待領袖核實（pending）」，必須由領袖在 vsbadge 內 CONFIRM；由 vsbadge 錄入回 BOOK 時，只無條件相信領袖已核實的資料，未核實項目絕不錄入。'}
       </p>
+
+      {demoBlocked && (
+        <div className="vsbsync__demo" role="note">
+          <Icon name="lock" size={17} />
+          <div>
+            <strong>{isEn ? 'Demo sample — submission to the live system is blocked' : '示範樣本 — 已封鎖送交正式系統'}</strong>
+            <p>{isEn ? 'Fictitious demo data must never sync to vsbadge. Reset to a blank book and fill in real records before submitting.' : '虛構示範資料絕不可同步至 vsbadge 正式系統；送交前請先清空重設為空白冊並填入真實紀錄。'}</p>
+          </div>
+        </div>
+      )}
 
       <div className="vsbsync__stats">
         <span>
@@ -341,7 +366,7 @@ export default function VsBadgeSyncCard({ readOnly = false }) {
             <button
               type="button"
               className="btn btn--gold btn--sm"
-              disabled={busy || pendingToSubmit.length === 0}
+              disabled={busy || pendingToSubmit.length === 0 || demoBlocked}
               onClick={submitBookProgressAsPending}
             >
               <Icon name="upload" size={14} />{' '}
@@ -449,7 +474,7 @@ export default function VsBadgeSyncCard({ readOnly = false }) {
       {/* BADGE 進度檔匯出／匯入只限已登入帳戶；完整 BOOK 備份仍可離線使用。 */}
       {hasBadgeSession ? (
         <div className="appxbtns vsbsync__files">
-          <button type="button" className="btn btn--ghost btn--sm" onClick={onExportFile}>
+          <button type="button" className="btn btn--ghost btn--sm" disabled={demoBlocked} onClick={onExportFile}>
             <Icon name="download" size={14} /> {isEn ? 'Export Pending Progress File' : '匯出「待領袖核實」進度檔'}
           </button>
           <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={onImportFile} />
