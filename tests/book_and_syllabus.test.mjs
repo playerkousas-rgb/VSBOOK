@@ -79,6 +79,8 @@ test('深資童軍肩章豁免規則與示範紀錄冊四階統計', () => {
   assert.equal(s.badges[1].percent, 100);
   assert.equal(s.badges[2].done, 4);
   assert.equal(s.badges[2].percent, 100);
+  assert.equal(s.badges[3].done, 4);
+  assert.equal(s.badges[3].percent, 100);
 
   // 測試深資童軍先修章 + 童軍標準獎章豁免肩章甲乙部
   const exemptBook = newBook({
@@ -96,7 +98,10 @@ test('深資童軍肩章豁免規則與示範紀錄冊四階統計', () => {
 
 test('與 vsbadge 純進度同步：BOOK 匯出一律為待核實（pending）、BADGE 匯入只信領袖已核實且零個人資料', () => {
   const demo = demoBook();
-  const exported = exportForVsBadge(demo, 'HKI-28');
+  assert.throws(() => exportForVsBadge(demo, 'HKI-28'), /示範樣本不可同步至正式系統/);
+  const real = structuredClone(demo);
+  real.meta.isDemo = false;
+  const exported = exportForVsBadge(real, 'HKI-28');
   assert.equal(exported.schema, 'vsbadge.pending.v1');
   assert.equal(exported.status, 'pending');
   assert.equal(exported.confirmed, false);
