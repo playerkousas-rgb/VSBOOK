@@ -2,7 +2,7 @@
 
 > **深資童軍個人隨身離線電子紀錄冊** —— 逐頁對應香港童軍總會《深資童軍紀錄冊》第 1–40 頁及 2026 年第十一版《深資童軍訓練綱要》，支援就地打字／手寫與簽名、一鍵生成及列印 `PT/65`・`PT/19`・`PT/20` 三張官方表格、成員⇄領袖純離線二維碼傳送與核簽回傳，以及登入後與 `vsbadge` 進度 JSON 雙向互通。
 
-- **目前版本**：`v1.0.4`（2026-11-12）
+- **目前版本**：`v1.0.5`（2026-11-14）
 - **架構形態**：離線優先 PWA（React + Vite + Service Worker，`localStorage` 本機儲存，零帳號、零雲端上傳；可選配 Vercel `/api/leader` 伺服器端領袖密碼驗證）
 - **設計主題**：對齊 `ROVERBOOK`（`v16`）介面、安全區與版權配置規範，採用**深資童軍紅布面燙金封面**（Venture Scout Maroon `#540f1e` × 支部酒紅 `#7a1426` × 燙金 `#d8b871` × 象牙內頁 `#f7f2e7`），內嵌支部徽及全套 13 張官方獎章／金帶圖案、全套 SVG／ICO／PNG／Maskable Favicon 圖示、**中英文完全分開顯示（節省版面）**，以及嚴格區隔**領袖模式（只讀）**與**普通模式（不能讀）**
 
@@ -57,6 +57,30 @@ rm -rf dist && node scripts/preflight_v1.0.mjs . --json
    - 設定後重新部署（Redeploy）；若未設定 `LEADER_CODE`，系統會自動隱藏領袖模式入口，作為純成員版運作。
 2. **`VSBADGE_ORIGIN`**（選填，預設自動對接部署網址 `https://vsbadge.vercel.app`）：
    - 供成員在「數位附錄」一鍵連接自己的 `vsbadge` 帳戶，錄入領袖已核實進度或將新填進度送交 `vsbadge` 待領袖核實（如有自建 `vsbadge` 網址，可設 `VSBADGE_ORIGIN=https://你的-vsbadge-網址`）。
+
+### 嵌入「服務平台」（iframe）
+
+全站回應以下標頭，只允許 VSBOOK 自身及指定服務平台嵌入；已移除 `X-Frame-Options: DENY`，亦不得設定 `SAMEORIGIN`：
+
+```
+Content-Security-Policy: frame-ancestors 'self' https://member-portal-sigma-swart.vercel.app
+```
+
+平台須委派相機及剪貼簿權限（使用正式公開別名）：
+
+```html
+<iframe src="https://vsbook-sand.vercel.app/" allow="camera; clipboard-write"></iframe>
+```
+
+| 功能 | 平台內 | 獨立版 |
+| :--- | :--- | :--- |
+| 相機掃描 | 須有 iframe `allow="camera"`、平台政策放行及使用者批准 | 不變 |
+| 本機儲存 | 與獨立版分開；私隱設定可能完全封鎖，Safari 可能喺關閉瀏覽器後清除 | 不變 |
+| 完整備份／還原 | 歡迎頁匯入；選單及嵌入提示條匯出；雙向搬移均用 JSON | 不變 |
+| 離線 | 先喺平台內連網開一次；平台頁面須仍開著或本身支援離線 | PWA 離線流程不變 |
+| 主畫面安裝 | 選單改為「開啟獨立版（新分頁）」 | 不變 |
+
+**搬移舊資料**：獨立版選單 →「匯出備份」→ 平台內 VSBOOK 歡迎頁「匯入備份」。反向搬移就喺平台匯出，再喺獨立版匯入。匯入會覆蓋目的地紀錄冊，請先備份；BADGE 純進度檔不是完整備份。詳情及 `sandbox` 注意事項見 [ADR 0003](docs/adr/0003-portal-iframe-embedding.md)。
 
 ---
 

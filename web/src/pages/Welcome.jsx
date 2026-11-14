@@ -4,6 +4,7 @@ import { demoBook, newBook } from '@shared/book.js';
 import { persistBook } from '../bookStore.js';
 import { navigate } from '../router.jsx';
 import { useLang } from '../i18n.jsx';
+import { EmbedWelcomeNote } from '../components/EmbedNotice.jsx';
 
 export default function Welcome({ onReady, onLeader }) {
   const { push } = useToast();
@@ -130,6 +131,8 @@ export default function Welcome({ onReady, onLeader }) {
             ? 'No account, no login. Your entire record book stays on this device — tap any line to fill, and present a QR code when sharing selected sections with your leader.'
             : '不需要帳號、不需要登入。整本冊子存在你這部裝置；逐頁點擊就可以填寫，並可出示二維碼讓領袖在「領袖模式（只讀）」下查閱及核簽。'}
         </p>
+
+        <EmbedWelcomeNote />
 
         <form className="welcome__form" onSubmit={create}>
           <div className="welcome__row">

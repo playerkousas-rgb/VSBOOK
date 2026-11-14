@@ -15,6 +15,7 @@
 - 資料與協定核心：`shared/syllabus.js`、`shared/book.js`、`shared/forms.js`、`shared/transfer.js`
 - 前端介面與離線快取：`web/index.html`、`web/src/`、`web/public/sw.js`、`web/public/icons/`
 - 自動化測試與閘門：`tests/`、`scripts/`
+- 服務平台嵌入：`vercel.json`、`shared/embed.js`、`web/src/components/EmbedNotice.jsx`；只准 `frame-ancestors 'self'` 加正式平台來源，不得加回 `X-Frame-Options`，保留 `camera=(self)`；跑 `npm test` 嵌入契約
 
 ## 3. 不可退讓底線（Non-Negotiables）
 

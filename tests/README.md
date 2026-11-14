@@ -21,3 +21,7 @@ npm test
   - 驗證 `App.jsx` 對齊全部 40 頁官方頁面＋總目錄＋數位附錄之路由映射；
   - 驗證 `Legal.jsx` 保留與 `ROVERBOOK` 完全一致之 `Copyright © 2026 SCOUT SYSTEM` 及非官方工具免責聲明；
   - 驗證 PWA `index.html`、`manifest.webmanifest`、圖示資源與 `sw.js` 離線快取契約。
+
+## 服務平台嵌入契約
+
+`tests/embed_contract.test.mjs`：精確白名單、全站標頭覆蓋、移除 X-Frame-Options、相機程式及權限保留、嵌入偵測、備份提示、無反嵌入跳轉，以及 README／ADR／速查卡同步。另有無頭 Chromium 實測，結果見 `docs/embed-browser-test.md`。
