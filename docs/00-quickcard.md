@@ -7,6 +7,7 @@
 | **本機儲存鍵** | `vsbook.book.v1`（紀錄冊主體）、`vsbook.lang`（語言 `zh`/`en`）、`vsbook.view`（視圖 `paper`/`card`）、`vsbook.signoff.applied.v1`（已寫入核簽序號） |
 | **互通格式** | `vsbadge.progress.v1`（以 `scoutId` 對齊 `L1-*`、`L2-*`、`L3-*`、`L4-*`、`OT-*` 完成日期） |
 | **二維碼協定** | `VS1.<base64url(gzip(JSON))>`（壓縮優先）或 `VS1P.<base64url(JSON)>`（無壓縮後備），上限 `2400` 字元 |
+| **服務平台嵌入** | `frame-ancestors 'self' https://member-portal-sigma-swart.vercel.app`；無 `X-Frame-Options`；平台 iframe 須 `allow="camera; clipboard-write"`；本機資料分開，以完整 JSON 備份搬移 |
 | **版權與聲明** | `Copyright © 2026 SCOUT SYSTEM — All Rights Reserved`（見 [`../LICENSE`](../LICENSE)）＋ 非官方獨立工具聲明 |
 
 ## 常用指令

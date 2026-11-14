@@ -2,6 +2,17 @@
 
 本專案採用語意化版本（Semantic Versioning），每次更新同步遞增四處版本號：`package.json`、`shared/book.js`（`APP_VERSION`）、`web/index.html`（`meta[name="app-version"]`）及 **Service Worker 快取名**（`web/public/sw.js` 的 `CACHE_NAME`）。只改程式碼不改快取名，已安裝的 APP 會永遠收到舊版面。
 
+## [v1.0.5] — 2026-11-14
+
+### 變更（Changed）
+- 對齊 CUBSBOOK PR #9：全站移除 `X-Frame-Options: DENY`，改設 `Content-Security-Policy: frame-ancestors 'self' https://member-portal-sigma-swart.vercel.app`；不設 `SAMEORIGIN`，其他網站仍被瀏覽器阻擋。
+- 保留 `Permissions-Policy: camera=(self), microphone=(), geolocation=()`、相機掃描、QR、列印及完整備份功能。平台 iframe 須帶 `allow="camera; clipboard-write"`。
+- Service Worker 快取同步升至 `vsbook-cache-v1.0.5`，四處版本號及 package-lock 同步。
+
+### 新增（Added）
+- 嵌入模式歡迎提示、頂部備份提示條及「開啟獨立版（新分頁）」選單；獨立開啟時不顯示，不修改紀錄冊或加入反嵌入跳轉。
+- `shared/embed.js`、`tests/embed_contract.test.mjs`（7 項）、ADR 0003 及文件，說明儲存分割、Safari／私隱封鎖、雙向 JSON 備份搬移及平台內離線快取限制。
+
 ## [v1.0.4] — 2026-11-12
 
 ### 修正（Fixed）

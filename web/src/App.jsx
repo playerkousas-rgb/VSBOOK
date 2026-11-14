@@ -10,6 +10,7 @@ import { Crest, Icon, ToastProvider, cx, useToast } from './ui.jsx';
 import { IndexSheet, Pager } from './components/Paper.jsx';
 import ShowQrDialog from './components/ShowQrDialog.jsx';
 import MenuDialog from './components/MenuDialog.jsx';
+import { EmbedRibbon } from './components/EmbedNotice.jsx';
 import LeaderGate from './components/LeaderGate.jsx';
 import Welcome from './pages/Welcome.jsx';
 import CoverPage from './pages/CoverPage.jsx';
@@ -247,6 +248,10 @@ function BookApp({ book, saveIssue, leader, leaderReady }) {
               : '領袖模式（只讀）：目前為唯讀狀態，不會修改本機資料。可按上方「領袖 · 只讀」掃描成員二維碼，或在選單退出領袖模式。'}
           </span>
         </div>
+      )}
+
+      {!printAll && !scanPath && !leaderRoute && (
+        <EmbedRibbon book={book} canBackup={!leader} />
       )}
 
       {!online && (
