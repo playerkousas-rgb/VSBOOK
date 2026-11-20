@@ -49,6 +49,7 @@ export default function VsBadgeSyncCard({ readOnly = false }) {
   const [busy, setBusy] = useState(false);
   const [remoteConfirmed, setRemoteConfirmed] = useState({});
   const [remotePendingIds, setRemotePendingIds] = useState([]);
+  const [remoteServiceCount, setRemoteServiceCount] = useState(0);
 
   useEffect(() => {
     if (mySid && !loginYmis) setLoginYmis(mySid);
@@ -95,6 +96,11 @@ export default function VsBadgeSyncCard({ readOnly = false }) {
     [book, remoteConfirmed, remotePendingIds],
   );
 
+  const localServiceCount = useMemo(
+    () => (Array.isArray(book?.serviceRecords) ? book.serviceRecords.filter((r) => r && (r.text || r.date)).length : 0),
+    [book],
+  );
+
   const pullConfirmedFromCloud = async (activeSession = session) => {
     if (!activeSession?.token || !activeSession?.troopId || !activeSession?.ymis) return;
     if (readOnly) {
@@ -128,13 +134,15 @@ export default function VsBadgeSyncCard({ readOnly = false }) {
       const pendingIds = (json.pendingRequests || []).map((x) => x.item_id).filter(Boolean);
       setRemoteConfirmed(confirmedMap);
       setRemotePendingIds(pendingIds);
+      const remoteServices = Array.isArray(json.serviceRecords) ? json.serviceRecords : [];
+      setRemoteServiceCount(remoteServices.length);
 
       const res = importFromVsBadge(json, book);
       replace(res.book);
       push(
         isEn
-          ? `Imported ${res.imported} leader-confirmed items${res.skippedPending ? ` (${res.skippedPending} unconfirmed skipped)` : ''}`
-          : `已無條件錄入 ${res.imported} 項領袖已核實進度${
+          ? `Imported ${res.imported} leader-confirmed items and ${res.importedServices} service records${res.skippedPending ? ` (${res.skippedPending} unconfirmed skipped)` : ''}`
+          : `已無條件錄入 ${res.imported} 項領袖已核實進度及 ${res.importedServices} 筆服務紀錄${
               res.skippedPending ? `（另有 ${res.skippedPending} 項待領袖核實，未錄入）` : ''
             }`,
       );
@@ -279,8 +287,8 @@ export default function VsBadgeSyncCard({ readOnly = false }) {
         replace(res.book);
         push(
           isEn
-            ? `Imported ${res.imported} leader-confirmed items${res.skippedPending ? ` (${res.skippedPending} unconfirmed skipped)` : ''}`
-            : `已錄入 ${res.imported} 項領袖已核實進度${
+            ? `Imported ${res.imported} leader-confirmed items and ${res.importedServices} service records${res.skippedPending ? ` (${res.skippedPending} unconfirmed skipped)` : ''}`
+            : `已錄入 ${res.imported} 項領袖已核實進度及 ${res.importedServices} 筆服務紀錄${
                 res.skippedPending ? `（已略過 ${res.skippedPending} 項未核實項目）` : ''
               }`,
         );
@@ -346,6 +354,16 @@ export default function VsBadgeSyncCard({ readOnly = false }) {
             {isEn ? 'Waiting for Leader in vsbadge' : '項正在 vsbadge 等候領袖 CONFIRM'}
           </span>
         )}
+        <span>
+          <b>{localServiceCount}</b>{' '}
+          {isEn ? 'service records in BOOK (read-only)' : '筆服務紀錄已錄入本冊（唯讀）'}
+        </span>
+        {remoteServiceCount > 0 && (
+          <span>
+            <b>{remoteServiceCount}</b>{' '}
+            {isEn ? 'service records leader-confirmed in vsbadge' : '筆服務紀錄已於 vsbadge 核實'}
+          </span>
+        )}
       </div>
 
       {/* 雲端直連 vsbadge */}
@@ -383,6 +401,7 @@ export default function VsBadgeSyncCard({ readOnly = false }) {
                 writeMemberSession(null);
                 setRemoteConfirmed({});
                 setRemotePendingIds([]);
+                setRemoteServiceCount(0);
                 push(isEn ? 'Signed out of vsbadge' : '已中斷 vsbadge 連線');
               }}
             >
@@ -470,6 +489,37 @@ export default function VsBadgeSyncCard({ readOnly = false }) {
           </div>
         </form>
       )}
+
+      {/* 服務紀錄：由 BADGE 唯讀錄入，只在 BOOK 顯示；BOOK → BADGE 仍需領袖核實，不由此送出。 */}
+      <div className="vsbsync__services" role="note">
+        <h4>
+          <Icon name="info" size={14} />{' '}
+          {isEn ? 'Service Records (read-only in BOOK)' : '服務紀錄（本冊只讀顯示）'}
+        </h4>
+        <p className="tiny">
+          {isEn
+            ? 'Service records are read from vsbadge and shown here only. BOOK never writes service records back to vsbadge: anything entered by a Scout must still be confirmed by a Leader inside vsbadge.'
+            : '服務紀錄只由 vsbadge 讀入並在本冊顯示；BOOK 不會把服務紀錄寫回 vsbadge，成員自行輸入的服務紀錄仍須由領袖在 BADGE 內核實。'}
+        </p>
+        {localServiceCount > 0 ? (
+          <ul className="vsbsync__servicelist">
+            {(book.serviceRecords || [])
+              .filter((r) => r && (r.text || r.date))
+              .slice(-6)
+              .reverse()
+              .map((row, i) => (
+                <li key={row.badgeRecordId || `${row.date || ''}-${i}`}>
+                  <span className="vsbsync__servicedate">{row.date || (isEn ? 'No date' : '未填日期')}</span>
+                  <span className="vsbsync__servicetext">{row.text}</span>
+                </li>
+              ))}
+          </ul>
+        ) : (
+          <span className="tiny">
+            {isEn ? 'No service records imported yet.' : '尚未錄入服務紀錄。'}
+          </span>
+        )}
+      </div>
 
       {/* BADGE 進度檔匯出／匯入只限已登入帳戶；完整 BOOK 備份仍可離線使用。 */}
       {hasBadgeSession ? (

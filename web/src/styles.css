@@ -4108,6 +4108,66 @@ html[data-print-preview] .write--multi.is-empty {
   font-weight: 700;
 }
 .vsbsync__refresh:disabled { opacity: 0.6; cursor: wait; }
+
+/* 服務紀錄（由 BADGE 唯讀錄入）：只用文字與細線，跟紙本內頁一致，不加卡片陰影 */
+.svcrecs {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(122, 20, 38, 0.22);
+}
+.svcrecs__empty {
+  padding: 3px 0 1px;
+}
+.svcrecs__table .pgtable__cell {
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.svcrecs__date,
+.svcrecs__hours {
+  white-space: nowrap;
+}
+
+.vsbsync__services {
+  margin: 10px 0 4px;
+  padding: 8px 0 2px;
+  border-top: 1px solid rgba(122, 20, 38, 0.2);
+}
+.vsbsync__services h4 {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0 0 3px;
+  font-family: var(--serif);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--vs-red);
+}
+.vsbsync__services p { margin: 0 0 5px; }
+.vsbsync__servicelist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+.vsbsync__servicelist li {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 8px;
+  padding: 2px 0;
+  border-bottom: 1px dotted rgba(122, 20, 38, 0.18);
+  font-size: 11.5px;
+  color: var(--ink-2);
+}
+.vsbsync__servicedate {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.vsbsync__servicetext {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+}
 @media print {
   .vsbsync__locked,
   .vsbsync__notfound,

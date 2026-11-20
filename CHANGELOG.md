@@ -2,6 +2,25 @@
 
 本專案採用語意化版本（Semantic Versioning），每次更新同步遞增四處版本號：`package.json`、`shared/book.js`（`APP_VERSION`）、`web/index.html`（`meta[name="app-version"]`）及 **Service Worker 快取名**（`web/public/sw.js` 的 `CACHE_NAME`）。只改程式碼不改快取名，已安裝的 APP 會永遠收到舊版面。
 
+## [v1.0.6] — 2026-11-20
+
+### 修正（Fixed）
+- **服務紀錄同步／匯入後在記錄冊內看不到**：對齊 CUBSBOOK 已核實的原因 —— `vsbadge` 的 Apps Script `Code.gs` 中 `action: 'load'` 只回傳進度（`progress` / `flatProgress`）及活動徽章（`otherBadges`），**不會回傳服務紀錄**；服務紀錄必須透過獨立的 `action: 'getServiceRecords'`（參數 `{ token, target_ymis }`，回傳 `{ success, records: [{ id, activity, date, hours, place, detail, status, note }] }`）讀取。本倉庫沿用同一契約並一次過修正三層：
+  - **API 代理層（`api/vsbadge.js`）**：`action === 'load'` 同步並行呼叫上游 `getServiceRecords`（失敗、逾時或舊版後端回 `Unknown action` 時一律安全降級為 `[]`，絕不影響領袖已核實進度的讀取），新增 `filterPersonalServiceRecords()` 清洗為零個人資料格式：排除 `status === 'rejected'`（及 pending／draft 等未核實狀態），每筆只保留 `id`、`activity`、`date`、`hours`、`place`，姓名、團員編號、備註、審批人等一律丟棄，結果附在 `load` 回應的 `serviceRecords`。
+  - **前端匯入（`shared/book.js` 的 `importFromVsBadge`）**：讀取 `json.serviceRecords` 寫入本冊新增的 `book.serviceRecords`（成員可在第 23 頁「社會服務金帶」及數位附錄看到）。以 `badgeRecordId` 及 `date|text` 雙重去重，重複同步不會產生重複行；只填補本機空白行或附加在尾端，**絕不覆蓋本機手寫紀錄**（`pages.p23.summary` 等頁面文字原封不動）；單獨帶服務紀錄、暫無進度更新的回應亦可匯入。
+  - **同步提示與介面**：連接 vsbadge 及匯入進度檔的提示訊息顯示已錄入的服務紀錄筆數；同步卡新增「服務紀錄（本冊只讀顯示）」統計與最近紀錄清單；第 23 頁新增唯讀服務紀錄表。
+- **BOOK → BADGE 的服務紀錄仍須領袖核實**：`BOOK` 只讀取及顯示服務紀錄，`exportForVsBadge()` 及 `submitPending` 一律**不含**服務紀錄（單元測試把關），成員自行輸入的服務紀錄不會繞過審批寫入 `vsbadge`；任何由 BOOK 送交的進度仍強制轉為 `requestComplete` 待領袖 CONFIRM。
+
+### 新增（Added）
+- 單元測試（`tests/vsbadge_sync.test.mjs`）6 項延伸：
+  - `filterPersonalServiceRecords()` 清洗與零個人資料驗證（含 rejected／pending 排除、異常回應降級 `[]`）；
+  - 代理層 `load` 確實同步呼叫上游 `getServiceRecords` 並帶 `target_ymis`，回應不含姓名／電郵／已拒絕紀錄，上游失敗時 `serviceRecords: []`；
+  - 匯入去重（`badgeRecordId`、`date|text`）、不覆蓋本機手寫紀錄、只帶服務紀錄亦可匯入；
+  - 迴歸保證 BOOK 匯出／送交待核實的 payload 不含任何服務紀錄。
+
+### 同步（Chore）
+- 四處版本號同步遞增至 `v1.0.6`（`package.json`、`shared/book.js` `APP_VERSION`、`web/index.html` meta、`web/public/sw.js` `CACHE_NAME`）及 `package-lock.json`。
+
 ## [v1.0.5] — 2026-11-14
 
 ### 變更（Changed）

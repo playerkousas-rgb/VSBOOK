@@ -5,7 +5,7 @@ import { BADGE_SYLLABUS, OTHER_BADGES, SYLLABUS_ITEMS, ITEM_INDEX, SYLLABUS_META
 
 export { BADGE_SYLLABUS, OTHER_BADGES, SYLLABUS_ITEMS, ITEM_INDEX, SYLLABUS_META };
 
-export const APP_VERSION = 'v1.0.5';
+export const APP_VERSION = 'v1.0.6';
 export const STORE_KEY = 'vsbook.book.v1';
 export const LEGACY_STORE_KEYS = [];
 
@@ -110,6 +110,8 @@ export function newBook(partial = {}) {
     otherBadges1: [],
     otherBadges2: [],
     additional: [],
+    /** 服務紀錄（由 vsbadge `getServiceRecords` 唯讀錄入；不送交 BADGE） */
+    serviceRecords: [],
     expeditions: [],
     progress: {},
     pages: {},
@@ -325,6 +327,21 @@ const UNCONFIRMED_STATUSES = new Set([
   'unverified',
   'unconfirmed',
 ]);
+
+/** 由 vsbadge `getServiceRecords` 錄入的服務紀錄，最多保留筆數（避免無限膨脹）。 */
+export const MAX_SERVICE_RECORDS = 120;
+
+/** 把單筆服務紀錄組成紀錄冊顯示文字（例：賣旗日服務（3小時） · 旺角）。 */
+export function formatServiceRecordText(rec) {
+  if (!rec || typeof rec !== 'object') return '';
+  const activity = String(rec.activity || rec.text || '').replace(/\s+/g, ' ').trim();
+  const place = String(rec.place || '').replace(/\s+/g, ' ').trim();
+  const hours = Number(rec.hours || 0);
+  let text = activity;
+  if (Number.isFinite(hours) && hours > 0) text += `（${hours}小時）`;
+  if (place) text += text ? ` · ${place}` : place;
+  return text.trim();
+}
 
 function isConfirmedBadgeEntry(val) {
   if (!val) return false;
@@ -584,7 +601,9 @@ export function importFromVsBadge(json, srcBook) {
     }
   }
 
-  if (!foundConfirmedContainer) {
+  // 服務紀錄同樣屬領袖已核實資料：只有服務紀錄而暫無進度的回應亦可匯入
+  const hasServiceRecords = Array.isArray(json.serviceRecords) && json.serviceRecords.length > 0;
+  if (!foundConfirmedContainer && !hasServiceRecords) {
     throw new Error('找不到可識別的 vsbadge 領袖已核實進度資料');
   }
 
@@ -629,12 +648,75 @@ export function importFromVsBadge(json, srcBook) {
     }
   });
 
+  // 服務紀錄：vsbadge 的 `load` 不含服務紀錄，代理層另以 `getServiceRecords` 讀取後
+  // 附在 `json.serviceRecords`。此處只錄入零個人資料的唯讀副本（`id`／`activity`／`date`／`hours`／`place`）：
+  // - 以 `badgeRecordId` 及 `date|text` 去重，重複同步不會產生重複行；
+  // - 一律附加在尾端，只填補本機空白行，絕不改寫或覆蓋本機手寫的服務紀錄；
+  // - 已拒絕（rejected）／未核實的紀錄不錄入；
+  // - 只寫入 BOOK，永不回流 BADGE（BOOK → BADGE 的服務紀錄仍須領袖在 BADGE 核實）。
+  let importedServices = 0;
+  if (Array.isArray(json.serviceRecords) && json.serviceRecords.length) {
+    const existing = (Array.isArray(next.serviceRecords) ? next.serviceRecords : []).filter(
+      (r) => r && typeof r === 'object',
+    );
+    const seenIds = new Set();
+    const seenKeys = new Set();
+    const keysOf = (row) =>
+      [
+        `${String(row?.date || '').trim()}|${String(row?.text || '').trim()}`,
+        `${String(row?.date || '').trim()}|${String(row?.activity || '').trim()}`,
+      ].filter((k) => k !== '|');
+    for (const row of existing) {
+      const id = String(row?.badgeRecordId || '').trim();
+      if (id) seenIds.add(id);
+      for (const k of keysOf(row)) seenKeys.add(k);
+    }
+
+    for (const rec of json.serviceRecords) {
+      if (!rec || typeof rec !== 'object' || Array.isArray(rec)) continue;
+      const status = String(rec.status || 'approved').trim().toLowerCase();
+      if (UNCONFIRMED_STATUSES.has(status)) continue;
+      const id = String(rec.id || rec.record_id || '').trim();
+      const date = String(rec.date || '').trim().slice(0, 10);
+      const text = formatServiceRecordText(rec);
+      if (!date && !text) continue;
+      if (id && seenIds.has(id)) continue;
+      const key = `${date}|${text}`;
+      if (seenKeys.has(key)) continue;
+
+      const hours = Number(rec.hours || 0);
+      const place = String(rec.place || '').replace(/\s+/g, ' ').trim();
+      const activity = String(rec.activity || '').replace(/\s+/g, ' ').trim();
+      const entry = {
+        ...(id ? { badgeRecordId: id } : {}),
+        ...(date ? { date } : {}),
+        ...(activity ? { activity } : {}),
+        text,
+        ...(Number.isFinite(hours) && hours > 0 ? { hours } : {}),
+        ...(place ? { place } : {}),
+        source: 'vsbadge',
+        confirmedByBadge: true,
+        at: now,
+      };
+      const emptyIdx = existing.findIndex((row) => !String(row?.text || '').trim() && !String(row?.date || '').trim() && !row?.badgeRecordId);
+      if (emptyIdx !== -1) existing[emptyIdx] = entry;
+      else existing.push(entry);
+      if (id) seenIds.add(id);
+      seenKeys.add(key);
+      importedServices += 1;
+      if (existing.length >= MAX_SERVICE_RECORDS && emptyIdx === -1) break;
+    }
+    next.serviceRecords = existing;
+  }
+
   // 嚴守「不錄入個人資料，只錄入進度」：絕不從 json.members 複製姓名、旅團、電郵等任何個人資料
   next.meta = { ...(next.meta || {}), updatedAt: now };
+  if (importedServices > 0) next.meta.lastServiceSyncAt = now;
 
   return {
     book: next,
     imported: imported.length,
+    importedServices,
     skippedPending,
     matchedBy: matchedBy || (mySid ? `SCOUT ID ${mySid}` : '已核實進度'),
   };
