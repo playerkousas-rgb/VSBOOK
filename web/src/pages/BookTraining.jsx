@@ -714,6 +714,62 @@ export function P22() {
   );
 }
 
+/** 服務紀錄唯讀表（由 vsbadge 錄入；此頁不可修改，BOOK 亦不會寫回 BADGE）。 */
+function ServiceRecordsPanel() {
+  const { book } = useBook();
+  const { isEn } = useLang();
+  const rows = (Array.isArray(book?.serviceRecords) ? book.serviceRecords : []).filter(
+    (r) => r && (r.date || r.text),
+  );
+
+  return (
+    <div className="svcrecs" role="note">
+      <Bilingual
+        as="h3"
+        className="secsub"
+        zh="已錄入的服務紀錄（唯讀）"
+        en="Imported Service Records (read-only)"
+      />
+      <P en="Read from vsbadge once a Leader has confirmed them. This page only displays them; BOOK never writes service records back to vsbadge — anything entered by a Scout must still be confirmed by a Leader in vsbadge.">
+        以下紀錄由 BADGE 於領袖核實後錄入，本頁只作顯示。BOOK
+        不會把服務紀錄寫回 BADGE；由成員自行填寫的服務紀錄，仍須由領袖在 BADGE 內核實。
+      </P>
+      {rows.length === 0 ? (
+        <p className="tiny svcrecs__empty">
+          {isEn
+            ? 'No service records imported yet. Connect vsbadge in the Digital Appendix to pull leader-confirmed records.'
+            : '尚未錄入服務紀錄。可在數位附錄連接 vsbadge，讀入領袖已核實的服務紀錄。'}
+        </p>
+      ) : (
+        <div className="pgtable pgtable--dense svcrecs__table" style={{ '--cols': '104px minmax(0, 1.6fr) 62px minmax(0, 1fr)' }}>
+          <div className="pgtable__head pgtable__row pgtable__row--4">
+            <span>{isEn ? 'Date' : '日期'}</span>
+            <span>{isEn ? 'Service' : '服務項目'}</span>
+            <span>{isEn ? 'Hours' : '時數'}</span>
+            <span>{isEn ? 'Place' : '地點 / 機構'}</span>
+          </div>
+          {rows.map((row, i) => (
+            <div className="pgtable__row pgtable__row--4" key={row.badgeRecordId || `${row.date || ''}-${i}`}>
+              <span className="pgtable__cell svcrecs__date" data-label={isEn ? 'Date' : '日期'}>
+                {row.date || '—'}
+              </span>
+              <span className="pgtable__cell" data-label={isEn ? 'Service' : '服務項目'}>
+                {row.activity || row.text || '—'}
+              </span>
+              <span className="pgtable__cell svcrecs__hours" data-label={isEn ? 'Hours' : '時數'}>
+                {row.hours || '—'}
+              </span>
+              <span className="pgtable__cell" data-label={isEn ? 'Place' : '地點 / 機構'}>
+                {row.place || '—'}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function P23() {
   return (
     <Page id="p23">
@@ -736,6 +792,7 @@ export function P23() {
         rows={9}
         placeholder="請填寫服務機構、時數、證書編號及服務內容..."
       />
+      <ServiceRecordsPanel />
     </Page>
   );
 }

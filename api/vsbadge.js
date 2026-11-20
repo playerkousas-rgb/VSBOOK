@@ -5,6 +5,8 @@
    1. 不錄入個人資料，只錄入進度（伺服器端剝除所有姓名、電郵、電話、其他成員資料）。
    2. BADGE → BOOK（action = 'load'）：只回傳該成員在 vsbadge 內「領袖已核實」的進度（`progress` / `otherBadges`），
       並另外列出「待領袖核實」（`pendingRequests`）供識別，未核實項目絕不混入已核實進度。
+      另同步呼叫上游 `getServiceRecords` 讀取該成員的服務紀錄（`load` 本身不含服務紀錄），
+      清洗為零個人資料格式後附在 `serviceRecords`；上游失敗時安全降級為 `[]`，絕不影響進度讀取。
    3. BOOK → BADGE（action = 'submitPending'）：嚴禁直接呼叫 `save`／`saveOtherBadge`（一律 403 拒絕）；
       所有由 BOOK 送出的進度一律轉發至 vsbadge 的 `requestComplete`，在 vsbadge 內變成「待領袖核實（pending）」，
       必須由領袖在 vsbadge 內 CONFIRM 方為完成，杜絕成員扮自己已完成。
@@ -14,6 +16,10 @@ export const DEFAULT_VSBADGE_ORIGIN = 'https://vsbadge.vercel.app';
 const EXEC_URL_RE = /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]{10,}\/exec\/?$/i;
 const TEST_LOCAL_RE = /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?(\/[A-Za-z0-9._~\-/?=&%]*)?$/;
 const ALLOWED_ACTIONS = new Set(['login', 'logout', 'load', 'submitPending']);
+/** 只供代理層內部呼叫的上游 action（不對外開放）。 */
+const SERVICE_RECORDS_ACTION = 'getServiceRecords';
+const MAX_SERVICE_RECORDS = 200;
+const UNCONFIRMED_SERVICE_STATUSES = new Set(['rejected', 'pending', 'local_draft', 'draft', 'unverified', 'unconfirmed']);
 const MAX_BODY_BYTES = 512 * 1024;
 const TIMEOUT_MS = 30000;
 
@@ -192,6 +198,37 @@ export function filterPersonalConfirmedLoad(raw, targetYmis) {
   };
 }
 
+/**
+ * 清洗 vsbadge `getServiceRecords` 回傳的個人服務紀錄：零個人資料、排除 rejected。
+ * 只保留 `id`、`activity`、`date`、`hours`、`place` 五個欄位；任何姓名、團員編號、
+ * 備註、審批人等一律丟棄。上游失敗或格式不符時回傳 `[]`（安全降級）。
+ */
+export function filterPersonalServiceRecords(raw) {
+  if (!raw || typeof raw !== 'object' || raw.success !== true || !Array.isArray(raw.records)) return [];
+  const out = [];
+  for (const rec of raw.records) {
+    if (!rec || typeof rec !== 'object' || Array.isArray(rec)) continue;
+    // 未核實／已拒絕的服務紀錄不得混入 BOOK
+    const status = String(rec.status || 'approved').trim().toLowerCase();
+    if (UNCONFIRMED_SERVICE_STATUSES.has(status)) continue;
+    const activity = String(rec.activity || rec.title || '').replace(/\s+/g, ' ').trim().slice(0, 120);
+    const date = String(rec.date || '').trim().slice(0, 10);
+    if (!activity && !date) continue;
+    const id = String(rec.id || rec.record_id || '').trim().slice(0, 48);
+    const hours = Number(rec.hours || 0);
+    const place = String(rec.place || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+    out.push({
+      ...(id ? { id } : {}),
+      activity,
+      date,
+      ...(Number.isFinite(hours) && hours > 0 ? { hours } : {}),
+      ...(place ? { place } : {}),
+    });
+    if (out.length >= MAX_SERVICE_RECORDS) break;
+  }
+  return out;
+}
+
 /** 清洗成員送交 vsbadge「待領袖核實」的申報項目（零個人資料，硬性轉為 requestComplete）。 */
 export function sanitizePendingSubmissions(items) {
   if (!Array.isArray(items)) return [];
@@ -355,11 +392,27 @@ export default async function handler(req, res) {
       if (!ymis) {
         return sendJson(res, 400, { success: false, error: '缺少童軍成員編號（SCOUT ID）' });
       }
-      const rawJson = await callVsBadgeAction({ origin, directTroop, troopId, action: 'load', data: { token } });
+      // `load` 只回傳進度／活動徽章，服務紀錄須另以 `getServiceRecords` 讀取。
+      // 兩者同步並行；服務紀錄失敗（舊版後端、未升級、逾時）一律安全降級為 []，
+      // 絕不影響領袖已核實進度的讀取。
+      const [rawJson, serviceRes] = await Promise.all([
+        callVsBadgeAction({ origin, directTroop, troopId, action: 'load', data: { token } }),
+        callVsBadgeAction({
+          origin,
+          directTroop,
+          troopId,
+          action: SERVICE_RECORDS_ACTION,
+          data: { token, target_ymis: ymis },
+        }).catch(() => null),
+      ]);
       if (!rawJson || typeof rawJson !== 'object') {
         return sendJson(res, 502, { success: false, error: 'vsbadge 後端回應異常' });
       }
-      return sendJson(res, 200, filterPersonalConfirmedLoad(rawJson, ymis));
+      const filtered = filterPersonalConfirmedLoad(rawJson, ymis);
+      if (filtered.success) {
+        filtered.serviceRecords = filterPersonalServiceRecords(serviceRes);
+      }
+      return sendJson(res, 200, filtered);
     }
 
     if (action === 'submitPending') {
