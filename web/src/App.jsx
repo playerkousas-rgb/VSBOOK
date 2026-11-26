@@ -12,6 +12,7 @@ import ShowQrDialog from './components/ShowQrDialog.jsx';
 import MenuDialog from './components/MenuDialog.jsx';
 import { EmbedRibbon } from './components/EmbedNotice.jsx';
 import LeaderGate from './components/LeaderGate.jsx';
+import StoreSupport from './components/StoreSupport.jsx';
 import Welcome from './pages/Welcome.jsx';
 import CoverPage from './pages/CoverPage.jsx';
 import { ContentsPage, P01, P02, P03, P04, P05, P06, P07, P08 } from './pages/BookFront.jsx';
@@ -188,6 +189,7 @@ function BookApp({ book, saveIssue, leader, leaderReady }) {
         )}
 
         <div className="chipbar__actions">
+          <StoreSupport />
           {leader && (
             <button
               type="button"

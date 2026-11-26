@@ -4,10 +4,12 @@ import App from './App.jsx';
 import './styles.css';
 import { registerPwa } from './pwa.js';
 
-registerPwa();
-
-createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-);
+// A blocked entry must not boot the book or register an installable PWA.
+if (!document.documentElement.hasAttribute('data-store-gated')) {
+  registerPwa();
+  createRoot(document.getElementById('root')).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>,
+  );
+}

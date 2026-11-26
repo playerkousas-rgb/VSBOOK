@@ -4240,3 +4240,27 @@ a.menu__item { color: inherit; text-decoration: none; }
 }
 
 .embedbar__btn:focus-visible, .embednote a:focus-visible { outline: 3px solid currentColor; outline-offset: 3px; }
+
+/* Non-blocking App Store support link. */
+.store-support {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 40px;
+  padding: 0 8px;
+  border-radius: 8px;
+  color: #f0d79a;
+  font-size: 11px;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.store-support--paper { color: #71192b; }
+.store-support[hidden] { display: none; }
+.store-support:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+@media (max-width: 430px) {
+  .chipbar .store-support span:last-child { display: none; }
+  .welcome__topbar { gap: 4px; }
+  .welcome__topbar .store-support { padding: 0 4px; font-size: 10px; }
+}
+@media print { .store-support { display: none !important; } }

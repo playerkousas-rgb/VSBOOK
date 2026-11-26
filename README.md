@@ -2,7 +2,7 @@
 
 > **深資童軍個人隨身離線電子紀錄冊** —— 逐頁對應香港童軍總會《深資童軍紀錄冊》第 1–40 頁及 2026 年第十一版《深資童軍訓練綱要》，支援就地打字／手寫與簽名、一鍵生成及列印 `PT/65`・`PT/19`・`PT/20` 三張官方表格、成員⇄領袖純離線二維碼傳送與核簽回傳，以及登入後與 `vsbadge` 進度 JSON 雙向互通。
 
-- **目前版本**：`v1.0.6`（2026-11-20）
+- **目前版本**：`v1.0.7`（2026-11-26）
 - **架構形態**：離線優先 PWA（React + Vite + Service Worker，`localStorage` 本機儲存，零帳號、零雲端上傳；可選配 Vercel `/api/leader` 伺服器端領袖密碼驗證）
 - **設計主題**：對齊 `ROVERBOOK`（`v16`）介面、安全區與版權配置規範，採用**深資童軍紅布面燙金封面**（Venture Scout Maroon `#540f1e` × 支部酒紅 `#7a1426` × 燙金 `#d8b871` × 象牙內頁 `#f7f2e7`），內嵌支部徽及全套 13 張官方獎章／金帶圖案、全套 SVG／ICO／PNG／Maskable Favicon 圖示、**中英文完全分開顯示（節省版面）**，以及嚴格區隔**領袖模式（只讀）**與**普通模式（不能讀）**
 
@@ -46,6 +46,15 @@ rm -rf dist && node scripts/preflight_v1.0.mjs . --json
    - **進度檔匯出／匯入**：僅限已連接並登入 BADGE 帳戶；未登入時按鈕會鎖定。此限制只適用 BADGE 進度檔，本機「完整備份 JSON／還原備份 JSON」及整本紀錄冊仍完全離線可用。
    - 數位附錄自動讀取 BADGE 已登記旅團；沒有旅團或選擇「找不到旅團」時才提供 BADGE 登記及成員開戶連結。
 7. **中英文完全分開（節省版面）與全套 Favicon／PWA 圖示**：頂欄與歡迎頁一鍵切換繁體中文／English，單語乾淨呈現、不並排重複佔位；齊備 `/favicon.svg`、`/favicon.ico`、`/favicon-32.png`、`/favicon-48.png` 及 `/icons/*` 全套 iOS / Android 主畫面與 OG 圖示。
+
+### 指定入口白名單（Store Gate）
+
+依治理倉 `playerkousas-rgb/readme` 的 SG1–SG19 與使用者確認，VSBOOK 採 `entry-gate`：`portalIds: ['appstore']`，`silentPortalIds: ['library', 'member']`，`allowStandalone: true`，`supportNudge` 關閉。由 SCOUT APP STORE、通告圖書館或成員系統進入時放行；直接開啟的新工作階段會顯示白名單提示及唯一的 APP STORE 按鈕，同分頁以 `sessionStorage` 記住通行；已安裝主畫面 PWA 可直接開啟。右上角「讚好／收藏」只連回主站 `?app=vsbook`（slug 對照主站 migration 核實），不向主站資料庫直接寫入。
+
+- **私隱和限制**：這是前端導流，不是身份驗證或安全邊界；來源可被偽造、`/api` 未受此閘限制，不能用來保護敏感資料。若閘腳本無法載入，紀錄冊會維持可用（fail-open）。紀錄冊及完整 JSON 備份仍留在本機。
+- **離線及舊連結**：先經准許入口在線開啟並完成快取，再離線使用；新分頁／新工作階段可能沒有通行紀錄而被攔截，建議先安裝主畫面及定期匯出完整 JSON。直接 `#v=` 分享連結若被攔截，返回主站會失去片段，領袖需先經入口進入再重新開啟分享連結。已安裝的舊版需要在線更新至新版才能快取閘腳本。
+- **成員系統**：保留原有 iframe CSP 與儲存隔離設計。入口瀏覽器須提供允許的 `Referer`，若入口使用 `noreferrer`、瀏覽器／私隱設定抑制來源或封鎖工作階段儲存，可能被擋或重整後要重新經入口；這並不會刪除原資料。獨立版與平台內儲存仍分開，搬移須用完整 JSON 備份。
+- 閘檔案由治理倉 `templates/vercel/store_gate_v1.0.js` 複製（commit `6ebfdd72a1ea5a5e83df4a6644fc66d0236df98e`）；Vite 的 `web/public/` 經建置輸出至 `dist/`。要關站或改入口，須評估現有用戶和備份，勿將 `iframe-only` 用於本機紀錄冊。
 
 ### Vercel 部署設定（領袖密碼 `LEADER_CODE` 及 `vsbadge` 後端配合）
 
