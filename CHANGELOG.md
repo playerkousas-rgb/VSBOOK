@@ -2,6 +2,13 @@
 
 本專案採用語意化版本（Semantic Versioning），每次更新同步遞增四處版本號：`package.json`、`shared/book.js`（`APP_VERSION`）、`web/index.html`（`meta[name="app-version"]`）及 **Service Worker 快取名**（`web/public/sw.js` 的 `CACHE_NAME`）。只改程式碼不改快取名，已安裝的 APP 會永遠收到舊版面。
 
+## [v1.0.7] — 2026-11-26
+
+### 新增（Added）
+- 按治理倉及用戶確認加入 Store Gate 頂層入口白名單：APP STORE、圖書館及成員系統；主畫面 PWA 豁免，現有成員系統 iframe CSP 不變。閘提示只顯示 APP STORE 按鈕。
+- 加入非阻塞「讚好／收藏」主站連結，使用已核實 slug `vsbook`；新增入口判斷、工作階段、遮罩、離線快取及部署路由測試。
+- 保留完整 JSON 備份。記錄前端閘非安全邊界、離線新工作階段與 `#v=` 分享連結限制；不新增伺服器驗票或個人資料上傳。
+
 ## [v1.0.6] — 2026-11-20
 
 ### 修正（Fixed）

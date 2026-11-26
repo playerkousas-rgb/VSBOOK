@@ -5,6 +5,7 @@ import { persistBook } from '../bookStore.js';
 import { navigate } from '../router.jsx';
 import { useLang } from '../i18n.jsx';
 import { EmbedWelcomeNote } from '../components/EmbedNotice.jsx';
+import StoreSupport from '../components/StoreSupport.jsx';
 
 export default function Welcome({ onReady, onLeader }) {
   const { push } = useToast();
@@ -120,6 +121,7 @@ export default function Welcome({ onReady, onLeader }) {
               <em>{isEn ? 'Venture Scout Record Book' : '深資童軍紀錄冊'}</em>
             </span>
           </div>
+          <StoreSupport onPaper />
           <button type="button" className="btn btn--onpaper btn--sm" onClick={toggle}>
             <Icon name="globe" size={13} /> {isEn ? '中文' : 'EN'}
           </button>

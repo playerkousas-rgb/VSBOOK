@@ -25,3 +25,5 @@ npm test
 ## 服務平台嵌入契約
 
 `tests/embed_contract.test.mjs`：精確白名單、全站標頭覆蓋、移除 X-Frame-Options、相機程式及權限保留、嵌入偵測、備份提示、無反嵌入跳轉，以及 README／ADR／速查卡同步。另有無頭 Chromium 實測，結果見 `docs/embed-browser-test.md`。
+
+`tests/store_gate.test.mjs`：入口來源精確比對、靜默放行、工作階段與主畫面豁免、提示遮罩、離線快取及部署 rewrite／支持連結契約；屬本機模擬，不能取代真機及實際入口驗證。
